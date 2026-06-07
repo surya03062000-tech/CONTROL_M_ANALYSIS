@@ -1,0 +1,26 @@
+{
+  "name": "Control-M Lineage Analyzer (v8)",
+  "tags": { "app": "controlm-analyzer" },
+  "max_concurrent_runs": 5,
+  "tasks": [
+    {
+      "task_key": "analyze",
+      "description": "Parse Control-M XML, resolve containers + Informatica workflows, write the Excel dashboard to the Volume, and return its path via notebook exit.",
+      "notebook_task": {
+        "notebook_path": "/Workspace/Users/REPLACE_ME@company.com/v8_github_source",
+        "base_parameters": {
+          "01_xml_filename": "",
+          "02_folder_filter": "",
+          "03_input_mode": "job_name",
+          "04_input_job_names": "",
+          "05_input_table_names": "",
+          "06_table_match_mode": "exact",
+          "07_direction": "predecessor",
+          "08_max_depth": "0"
+        }
+      },
+      "existing_cluster_id": "REPLACE_WITH_CLUSTER_ID",
+      "timeout_seconds": 3600
+    }
+  ]
+}
