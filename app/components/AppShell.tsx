@@ -5,22 +5,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Workflow, GitCompareArrows, FileSpreadsheet, FileText,
-  CalendarDays, KeyRound, Sparkles, Menu, X,
+  CalendarDays, KeyRound, Gamepad2, Menu, X, ExternalLink,
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import { ToastProvider } from "./Toast";
 
-interface NavItem { href: string; label: string; icon: any; soon?: boolean; }
+interface NavItem { href: string; label: string; icon: any; soon?: boolean; external?: boolean; }
 
 const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/control-m", label: "Control-M Analysis", icon: Workflow },
+  { href: "https://uno-game-jsys.onrender.com/", label: "Fun Zone — UNO", icon: Gamepad2, external: true },
   { href: "#", label: "Drift Analysis", icon: GitCompareArrows, soon: true },
   { href: "#", label: "STM Generator", icon: FileSpreadsheet, soon: true },
   { href: "#", label: "DG / HLD Docs", icon: FileText, soon: true },
   { href: "#", label: "Leave Tracker", icon: CalendarDays, soon: true },
   { href: "#", label: "Access Requests", icon: KeyRound, soon: true },
-  { href: "#", label: "Fun Zone", icon: Sparkles, soon: true },
 ];
 
 function RogersLogo() {
@@ -60,9 +60,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <Icon size={18} className="nav-ico" />
                   <span>{n.label}</span>
                   {n.soon && <span className="soon">soon</span>}
+                  {n.external && <ExternalLink size={13} className="ext-ico" />}
                 </>
               );
               if (n.soon) return <span key={n.label} className="nav-item disabled">{inner}</span>;
+              if (n.external) return (
+                <a key={n.label} href={n.href} target="_blank" rel="noreferrer" className="nav-item"
+                   onClick={() => setOpen(false)}>
+                  {inner}
+                </a>
+              );
               return (
                 <Link key={n.label} href={n.href} className={`nav-item ${active ? "active" : ""}`}
                       onClick={() => setOpen(false)}>

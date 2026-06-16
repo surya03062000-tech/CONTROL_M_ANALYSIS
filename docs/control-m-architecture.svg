@@ -1,0 +1,236 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="1000" viewBox="0 0 1480 1000" font-family="'Segoe UI', system-ui, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#fbf3f2"/>
+    </linearGradient>
+    <linearGradient id="redbar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#DA291C"/>
+      <stop offset="1" stop-color="#A4130B"/>
+    </linearGradient>
+    <linearGradient id="header" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#DA291C"/>
+      <stop offset="1" stop-color="#8f0f06"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#1b2a4a" flood-opacity="0.14"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#DA291C"/>
+    </marker>
+    <marker id="arrowG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#15803d"/>
+    </marker>
+    <style>
+      .zone   { font-size:13px; font-weight:800; letter-spacing:1.5px; fill:#DA291C; }
+      .title  { font-size:15.5px; font-weight:700; fill:#14203a; }
+      .body   { font-size:12px; fill:#3f4c68; }
+      .mono   { font-size:11.5px; font-family:ui-monospace,Consolas,monospace; fill:#5b6880; }
+      .h1     { font-size:24px; font-weight:800; fill:#14203a; }
+      .hsub   { font-size:13.5px; fill:#5b6880; }
+      .brand  { font-size:27px; font-weight:900; letter-spacing:.5px; fill:#DA291C; }
+      .tag    { font-size:10.5px; font-weight:700; letter-spacing:.8px; fill:#8a96ad; }
+      .blab   { font-size:12.5px; font-weight:700; fill:#fff; }
+      .leg    { font-size:12.5px; fill:#3f4c68; }
+      .legb   { font-size:12.5px; font-weight:700; fill:#14203a; }
+    </style>
+  </defs>
+
+  <rect width="1480" height="1000" fill="url(#bg)"/>
+
+  <!-- ── Header ─────────────────────────────────────────────── -->
+  <g transform="translate(48,34)">
+    <g transform="scale(0.92)">
+      <path d="M24 24 C19 13 27 4 39 9 C35 15 30 19 26 24 Z" fill="#DA291C" transform="rotate(0 24 24)"/>
+      <path d="M24 24 C19 13 27 4 39 9 C35 15 30 19 26 24 Z" fill="#DA291C" transform="rotate(120 24 24)"/>
+      <path d="M24 24 C19 13 27 4 39 9 C35 15 30 19 26 24 Z" fill="#DA291C" transform="rotate(240 24 24)"/>
+    </g>
+    <text x="52" y="22" class="brand">ROGERS</text>
+    <text x="53" y="40" class="tag">DATA ENGINEERING</text>
+  </g>
+  <text x="48" y="132" class="h1">Control‑M Lineage Analyzer — High‑Level Architecture</text>
+  <text x="48" y="156" class="hsub">Self‑service web app on Vercel that triggers a Databricks job to parse Control‑M lineage, then renders the diagram and Excel dashboard.</text>
+  <line x1="48" y1="174" x2="1432" y2="174" stroke="#eccfcc" stroke-width="2"/>
+
+  <!-- ── Zone group containers ──────────────────────────────── -->
+  <g>
+    <rect x="40"   y="208" width="250" height="640" rx="16" fill="none" stroke="#e0c4c1" stroke-width="1.5" stroke-dasharray="6 6"/>
+    <rect x="320"  y="208" width="340" height="640" rx="16" fill="none" stroke="#e0c4c1" stroke-width="1.5" stroke-dasharray="6 6"/>
+    <rect x="690"  y="208" width="400" height="640" rx="16" fill="none" stroke="#e0c4c1" stroke-width="1.5" stroke-dasharray="6 6"/>
+    <rect x="1120" y="208" width="312" height="640" rx="16" fill="none" stroke="#e0c4c1" stroke-width="1.5" stroke-dasharray="6 6"/>
+    <text x="60"   y="232" class="zone">END USER</text>
+    <text x="340"  y="232" class="zone">VERCEL · NEXT.JS</text>
+    <text x="710"  y="232" class="zone">DATABRICKS WORKSPACE</text>
+    <text x="1140" y="232" class="zone">SOURCES &amp; OUTPUTS</text>
+  </g>
+
+  <!-- ── USER box ───────────────────────────────────────────── -->
+  <g filter="url(#shadow)">
+    <rect x="56" y="390" width="218" height="200" rx="14" fill="#fff" stroke="#e7ebf2"/>
+    <rect x="56" y="390" width="6" height="200" rx="3" fill="url(#redbar)"/>
+  </g>
+  <text x="80" y="420" class="title">Browser</text>
+  <text x="80" y="448" class="body">• Drag‑and‑drop XML upload</text>
+  <text x="80" y="472" class="body">• Run parameters &amp; modes</text>
+  <text x="80" y="496" class="body">• Live status + stepper</text>
+  <text x="80" y="520" class="body">• Pan/zoom diagram view</text>
+  <text x="80" y="544" class="body">• Download Excel dashboard</text>
+
+  <!-- ── VERCEL boxes ───────────────────────────────────────── -->
+  <g filter="url(#shadow)">
+    <rect x="342" y="258" width="296" height="96" rx="14" fill="#fff" stroke="#e7ebf2"/>
+    <rect x="342" y="258" width="6" height="96" rx="3" fill="url(#redbar)"/>
+  </g>
+  <text x="366" y="288" class="title">Web UI  /control-m</text>
+  <text x="366" y="314" class="body">Upload · form · status · results</text>
+  <text x="366" y="336" class="mono">React (Next.js App Router)</text>
+
+  <g filter="url(#shadow)">
+    <rect x="342" y="384" width="296" height="214" rx="14" fill="#fff" stroke="#e7ebf2"/>
+    <rect x="342" y="384" width="6" height="214" rx="3" fill="url(#redbar)"/>
+  </g>
+  <text x="366" y="414" class="title">API Routes (server)</text>
+  <text x="366" y="442" class="mono">POST /api/upload</text>
+  <text x="366" y="466" class="mono">POST /api/run</text>
+  <text x="366" y="490" class="mono">GET  /api/status</text>
+  <text x="366" y="514" class="mono">POST /api/cancel</text>
+  <text x="366" y="538" class="mono">GET  /api/outputs</text>
+  <text x="366" y="562" class="mono">GET  /api/download</text>
+  <text x="366" y="586" class="body">Maps form → notebook widgets</text>
+
+  <g filter="url(#shadow)">
+    <rect x="342" y="628" width="296" height="100" rx="14" fill="#fff" stroke="#e7ebf2"/>
+    <rect x="342" y="628" width="6" height="100" rx="3" fill="url(#redbar)"/>
+  </g>
+  <text x="366" y="658" class="title">lib/databricks.ts  🔒</text>
+  <text x="366" y="684" class="body">Server‑only REST client.</text>
+  <text x="366" y="706" class="body">Token never reaches the browser.</text>
+
+  <!-- ── DATABRICKS boxes ───────────────────────────────────── -->
+  <g filter="url(#shadow)">
+    <rect x="712" y="258" width="356" height="96" rx="14" fill="#fff" stroke="#e7ebf2"/>
+    <rect x="712" y="258" width="6" height="96" rx="3" fill="url(#redbar)"/>
+  </g>
+  <text x="736" y="288" class="title">Jobs API 2.1</text>
+  <text x="736" y="314" class="mono">run-now · runs/get</text>
+  <text x="736" y="336" class="mono">runs/get-output · runs/cancel</text>
+
+  <g filter="url(#shadow)">
+    <rect x="712" y="382" width="356" height="86" rx="14" fill="#fff" stroke="#e7ebf2"/>
+    <rect x="712" y="382" width="6" height="86" rx="3" fill="url(#redbar)"/>
+  </g>
+  <text x="736" y="412" class="title">Files API 2.0</text>
+  <text x="736" y="440" class="mono">PUT (upload) · GET (download .xlsx)</text>
+
+  <g filter="url(#shadow)">
+    <rect x="712" y="496" width="356" height="98" rx="14" fill="#fff" stroke="#e7ebf2"/>
+    <rect x="712" y="496" width="6" height="98" rx="3" fill="url(#redbar)"/>
+  </g>
+  <text x="736" y="526" class="title">Unity Catalog Volume</text>
+  <text x="736" y="552" class="mono">/Volumes/edl_qa/qa_agent/control_m</text>
+  <text x="736" y="576" class="body">XML in  ·  .xlsx out</text>
+
+  <g filter="url(#shadow)">
+    <rect x="712" y="622" width="356" height="206" rx="14" fill="#fff" stroke="#e7ebf2"/>
+    <rect x="712" y="622" width="6" height="206" rx="3" fill="url(#redbar)"/>
+  </g>
+  <text x="736" y="652" class="title">Analyzer Notebook</text>
+  <text x="736" y="680" class="body">1 · Parse Control‑M XML</text>
+  <text x="736" y="704" class="body">2 · Resolve containers + notebooks</text>
+  <text x="736" y="728" class="body">3 · Informatica + LLM enrichment</text>
+  <text x="736" y="752" class="body">4 · Validation &amp; health checks</text>
+  <text x="736" y="776" class="body">5 · Build Mermaid + Excel</text>
+  <text x="736" y="804" class="mono">dbutils.notebook.exit(JSON)</text>
+
+  <!-- ── SOURCES & OUTPUTS boxes ────────────────────────────── -->
+  <g filter="url(#shadow)">
+    <rect x="1136" y="258" width="280" height="84" rx="14" fill="#fff" stroke="#e7ebf2"/>
+    <rect x="1136" y="258" width="6" height="84" rx="3" fill="#2b3a55"/>
+  </g>
+  <text x="1160" y="286" class="title">GitHub Repos</text>
+  <text x="1160" y="312" class="body">Container JSON + derived notebooks</text>
+  <text x="1160" y="332" class="mono">PAT · Contents: Read</text>
+
+  <g filter="url(#shadow)">
+    <rect x="1136" y="358" width="280" height="80" rx="14" fill="#fff" stroke="#e7ebf2"/>
+    <rect x="1136" y="358" width="6" height="80" rx="3" fill="#2b3a55"/>
+  </g>
+  <text x="1160" y="386" class="title">Informatica</text>
+  <text x="1160" y="412" class="body">wf_ workflows + .prm params</text>
+  <text x="1160" y="430" class="mono">(read from Volume)</text>
+
+  <g filter="url(#shadow)">
+    <rect x="1136" y="454" width="280" height="80" rx="14" fill="#fff" stroke="#e7ebf2"/>
+    <rect x="1136" y="454" width="6" height="80" rx="3" fill="#2b3a55"/>
+  </g>
+  <text x="1160" y="482" class="title">LLM Endpoint</text>
+  <text x="1160" y="508" class="body">Llama 3.3 70B · Model Serving</text>
+  <text x="1160" y="526" class="mono">pipeline enrichment</text>
+
+  <line x1="1136" y1="556" x2="1416" y2="556" stroke="#eccfcc" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <text x="1140" y="578" class="zone" fill="#15803d">OUTPUTS</text>
+
+  <g filter="url(#shadow)">
+    <rect x="1136" y="590" width="280" height="78" rx="14" fill="#fff" stroke="#e7ebf2"/>
+    <rect x="1136" y="590" width="6" height="78" rx="3" fill="#15803d"/>
+  </g>
+  <text x="1160" y="618" class="title">Excel Dashboard</text>
+  <text x="1160" y="644" class="body">Multi‑sheet .xlsx + graph PNG</text>
+
+  <g filter="url(#shadow)">
+    <rect x="1136" y="684" width="280" height="92" rx="14" fill="#fff" stroke="#e7ebf2"/>
+    <rect x="1136" y="684" width="6" height="92" rx="3" fill="#15803d"/>
+  </g>
+  <text x="1160" y="712" class="title">Mermaid Diagram</text>
+  <text x="1160" y="738" class="body">+ flow summary (JSON exit)</text>
+  <text x="1160" y="760" class="body">rendered in the browser</text>
+
+  <!-- ── Flow arrows ────────────────────────────────────────── -->
+  <!-- user <-> UI -->
+  <line x1="274" y1="430" x2="342" y2="306" stroke="#DA291C" stroke-width="2.4" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <!-- UI -> API -->
+  <line x1="490" y1="354" x2="490" y2="384" stroke="#DA291C" stroke-width="2.4" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <!-- API -> lib -->
+  <line x1="490" y1="598" x2="490" y2="628" stroke="#DA291C" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <!-- lib/API -> Jobs API (run, status) -->
+  <path d="M638 470 C 678 470 678 306 712 306" fill="none" stroke="#DA291C" stroke-width="2.4" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <!-- lib/API -> Files API (upload/download) -->
+  <path d="M638 500 C 678 500 678 425 712 425" fill="none" stroke="#DA291C" stroke-width="2.4" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <!-- Jobs API -> Notebook (triggers) -->
+  <path d="M1050 354 C 1086 470 1086 560 980 622" fill="none" stroke="#DA291C" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <!-- Files API <-> Volume -->
+  <line x1="890" y1="468" x2="890" y2="496" stroke="#DA291C" stroke-width="2.4" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <!-- Volume <-> Notebook -->
+  <line x1="820" y1="594" x2="820" y2="622" stroke="#DA291C" stroke-width="2.4" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <!-- Notebook -> sources (enrich) -->
+  <path d="M1068 690 C 1102 560 1102 420 1136 398" fill="none" stroke="#2b3a55" stroke-width="2.2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <!-- Notebook -> outputs -->
+  <path d="M1068 770 C 1100 740 1108 700 1136 690" fill="none" stroke="#15803d" stroke-width="2.4" marker-end="url(#arrowG)"/>
+  <path d="M1068 780 C 1100 700 1108 640 1136 629" fill="none" stroke="#15803d" stroke-width="2.2" marker-end="url(#arrowG)"/>
+
+  <!-- numbered flow badges -->
+  <g font-weight="800" font-size="13" fill="#fff" text-anchor="middle">
+    <circle cx="668" cy="408" r="13" fill="#DA291C"/><text x="668" y="413">1</text>
+    <circle cx="668" cy="378" r="13" fill="#DA291C"/><text x="668" y="383">2</text>
+    <circle cx="1086" cy="470" r="13" fill="#DA291C"/><text x="1086" y="475">3</text>
+    <circle cx="1100" cy="500" r="13" fill="#15803d"/><text x="1100" y="505">4</text>
+  </g>
+
+  <!-- ── Bottom flow legend ─────────────────────────────────── -->
+  <g transform="translate(48,876)">
+    <rect x="0" y="0" width="1384" height="96" rx="14" fill="#fff" stroke="#e7ebf2" filter="url(#shadow)"/>
+    <text x="20" y="28" class="zone">REQUEST FLOW</text>
+    <g transform="translate(20,52)">
+      <text class="leg"><tspan class="legb">1  Upload</tspan>  XML → Files API PUT → Volume</text>
+      <text x="340" class="leg"><tspan class="legb">2  Run</tspan>  → Jobs run-now triggers the notebook</text>
+      <text x="720" class="leg"><tspan class="legb">3  Enrich</tspan>  GitHub · Informatica · LLM</text>
+      <text x="1040" class="leg"><tspan class="legb">4  Write</tspan>  .xlsx + diagram to Volume</text>
+    </g>
+    <g transform="translate(20,80)">
+      <text class="leg"><tspan class="legb">5  Poll</tspan>  /api/status → runs/get-output (JSON)</text>
+      <text x="340" class="leg"><tspan class="legb">6  Render</tspan>  Mermaid diagram + flow summary</text>
+      <text x="720" class="leg"><tspan class="legb">7  Download</tspan>  Excel via Files API GET</text>
+      <text x="1040" class="leg" fill="#15803d"><tspan class="legb" fill="#15803d">🔒  Token</tspan>  stays server‑side only</text>
+    </g>
+  </g>
+</svg>
