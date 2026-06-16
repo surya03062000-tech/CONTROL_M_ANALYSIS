@@ -131,14 +131,19 @@ export default function Page() {
 
   const busy = phase === "submitting" || phase === "running";
   const life = status?.life_cycle_state || (phase === "submitting" ? "STARTING" : "");
-  const stepIdx = lifeToStep(phase, life);
+  const curStage = currentStage(phase, life);
   const flow = status?.flow || null;
 
   return (
     <div className="wrap">
       <header className="header">
-        <div className="logo">⛓️</div>
-        <div>
+        <div className="brand">
+          <RogersLogo />
+          <span className="rogers-word">ROGERS</span>
+          <span className="brand-divider" />
+          <span className="brand-tag">Data Engineering</span>
+        </div>
+        <div className="titles">
           <h1>Control-M Lineage Analyzer</h1>
           <p className="sub">
             Upload a Control-M workspace export, run the Databricks lineage job, then explore the
@@ -292,10 +297,31 @@ export default function Page() {
             )}
           </div>
 
-          <div className="steps">
-            {["Queued", "Running", "Done"].map((lbl, i) => (
-              <div key={lbl} className={`step ${i < stepIdx ? "done" : i === stepIdx ? "active" : ""}`} />
-            ))}
+          <ol className="stepper">
+            {STAGES.map((label, i) => {
+              const cls = stageClass(phase, curStage, i);
+              return (
+                <li key={label} className={cls}>
+                  <span className="step-ico">
+                    {cls === "done" ? "✓" : cls === "err" ? "✕" : i + 1}
+                  </span>
+                  <span className="step-name">{label}</span>
+                </li>
+              );
+            })}
+          </ol>
+
+          <div className="stage-hint">
+            {phase === "success" ? (
+              <>All steps completed ✓</>
+            ) : phase === "error" ? (
+              <>Failed at <b>{STAGES[curStage]}</b></>
+            ) : (
+              <>
+                Now: <b>{STAGES[curStage]}</b>
+                {curStage < STAGES.length - 1 && <> · Next: <b>{STAGES[curStage + 1]}</b></>}
+              </>
+            )}
           </div>
 
           {error && <div className="note err" style={{ marginTop: 14 }}>⚠ {error}</div>}
@@ -411,8 +437,51 @@ function prettyPhase(phase: Phase, life: string) {
   if (phase === "running") return `Running (${life || "…"})`;
   return "Idle";
 }
-function lifeToStep(phase: Phase, life: string): number {
-  if (phase === "success" || phase === "error") return 2;
-  if (life === "RUNNING" || life === "TERMINATING") return 1;
+// Stages shown in the run-status stepper, in order. Mapped from the Databricks
+// run life-cycle so the user can see what's happening now and what comes next.
+const STAGES = ["Queued", "Running", "Finalizing", "Completed"] as const;
+
+function currentStage(phase: Phase, life: string): number {
+  if (phase === "success") return 3;
+  if (phase === "submitting") return 0;
+  if (phase === "running") {
+    if (life === "RUNNING") return 1;
+    if (life === "TERMINATING") return 2;
+    return 0; // PENDING / QUEUED / BLOCKED / WAITING_FOR_RETRY
+  }
+  if (phase === "error") {
+    if (life === "TERMINATING") return 2;
+    return 1; // assume it failed while running
+  }
   return 0;
+}
+
+function stageClass(phase: Phase, cur: number, i: number): "done" | "active" | "err" | "todo" {
+  if (phase === "success") return "done";
+  if (phase === "error") return i < cur ? "done" : i === cur ? "err" : "todo";
+  return i < cur ? "done" : i === cur ? "active" : "todo";
+}
+
+// Rogers brand swirl (inline SVG so it scales crisply and needs no asset).
+function RogersLogo() {
+  return (
+    <span className="rogers-mark" aria-label="Rogers">
+      <svg viewBox="0 0 48 48" role="img" aria-hidden="true">
+        <g fill="#DA291C">
+          <path
+            d="M24 24 C19 13 27 4 39 9 C35 15 30 19 26 24 Z"
+            transform="rotate(0 24 24)"
+          />
+          <path
+            d="M24 24 C19 13 27 4 39 9 C35 15 30 19 26 24 Z"
+            transform="rotate(120 24 24)"
+          />
+          <path
+            d="M24 24 C19 13 27 4 39 9 C35 15 30 19 26 24 Z"
+            transform="rotate(240 24 24)"
+          />
+        </g>
+      </svg>
+    </span>
+  );
 }
