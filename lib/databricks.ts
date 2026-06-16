@@ -1,13 +1,25 @@
 // Minimal Databricks REST client used by the API routes (runs server-side only).
 // The token lives in env vars and is never exposed to the browser.
 
-const HOST = (process.env.DATABRICKS_HOST || "").replace(/\/+$/, "");
-const TOKEN = process.env.DATABRICKS_TOKEN || "";
-const JOB_ID = process.env.DATABRICKS_JOB_ID || "";
-const OUTPUT_VOLUME = (process.env.OUTPUT_VOLUME || "").replace(/\/+$/, "");
+// Sanitise env values: strip surrounding whitespace/newlines and accidental quotes,
+// and a stray "Bearer " prefix. Pasting a token into a dashboard often appends a
+// trailing newline or wraps it in quotes — Databricks then returns 403
+// "Invalid access token", so we defend against that here.
+function clean(v: string | undefined): string {
+  return (v || "")
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/^Bearer\s+/i, "")
+    .trim();
+}
+
+const HOST = clean(process.env.DATABRICKS_HOST).replace(/\/+$/, "");
+const TOKEN = clean(process.env.DATABRICKS_TOKEN);
+const JOB_ID = clean(process.env.DATABRICKS_JOB_ID);
+const OUTPUT_VOLUME = clean(process.env.OUTPUT_VOLUME).replace(/\/+$/, "");
 // Volume folder the notebook reads its XML from (CONFIG["xml_folder"]). Uploads land here.
 // Falls back to OUTPUT_VOLUME so a single-folder setup still works out of the box.
-const INPUT_VOLUME = (process.env.INPUT_VOLUME || process.env.OUTPUT_VOLUME || "").replace(/\/+$/, "");
+const INPUT_VOLUME = (clean(process.env.INPUT_VOLUME) || clean(process.env.OUTPUT_VOLUME)).replace(/\/+$/, "");
 
 export function getInputVolume(): string {
   return INPUT_VOLUME;
@@ -122,6 +134,17 @@ export async function uploadFile(
     headers: { "Content-Type": "application/octet-stream" },
     body: data,
   });
-  if (!res.ok) throw new Error(`upload failed (${res.status}): ${await res.text()}`);
+  if (!res.ok) {
+    const text = await res.text();
+    if (res.status === 401 || res.status === 403 || /invalid access token/i.test(text)) {
+      throw new Error(
+        `Databricks rejected the token (${res.status}). The same DATABRICKS_TOKEN is used for ` +
+          `Run/Status/Download, so this is an auth problem, not the upload path. Generate a fresh ` +
+          `PAT and re-set DATABRICKS_TOKEN/DATABRICKS_HOST (no quotes or trailing spaces), then ` +
+          `redeploy. Also confirm the token has write on ${INPUT_VOLUME}. — ${text}`
+      );
+    }
+    throw new Error(`upload failed (${res.status}): ${text}`);
+  }
   return { path: absPath };
 }
