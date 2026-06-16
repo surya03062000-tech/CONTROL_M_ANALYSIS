@@ -96,8 +96,20 @@ export async function getRunOutput(taskRunId: number | string): Promise<{ result
   return { result: j?.notebook_output?.result, error: j?.error };
 }
 
-// List recent .xlsx files in the output Volume (fallback if the exit value is unavailable).
-export async function listOutputs(): Promise<Array<{ path: string; name: string }>> {
+// Cancel a running job run.
+export async function cancelRun(runId: number | string): Promise<void> {
+  assertConfig();
+  const res = await dbx(`/api/2.1/jobs/runs/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ run_id: Number(runId) }),
+  });
+  if (!res.ok) throw new Error(`runs/cancel failed (${res.status}): ${await res.text()}`);
+}
+
+export interface OutputFile { path: string; name: string; size: number; modified: number; }
+
+// List recent .xlsx files in the output Volume (newest first) — powers the run history.
+export async function listOutputs(): Promise<OutputFile[]> {
   assertConfig();
   if (!OUTPUT_VOLUME) return [];
   const res = await dbx(`/api/2.0/fs/directories${encodePath(OUTPUT_VOLUME)}`, { method: "GET" });
@@ -106,7 +118,13 @@ export async function listOutputs(): Promise<Array<{ path: string; name: string 
   const entries: any[] = j?.contents || [];
   return entries
     .filter((e) => !e.is_directory && String(e.path).toLowerCase().endsWith(".xlsx"))
-    .map((e) => ({ path: e.path as string, name: String(e.path).split("/").pop() as string }));
+    .map((e) => ({
+      path: e.path as string,
+      name: String(e.path).split("/").pop() as string,
+      size: Number(e.file_size ?? 0),
+      modified: Number(e.last_modified ?? 0),
+    }))
+    .sort((a, b) => b.modified - a.modified);
 }
 
 // Stream a single file from the Volume via the Files API.

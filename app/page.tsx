@@ -1,487 +1,58 @@
-"use client";
+import Link from "next/link";
+import {
+  Workflow, GitCompareArrows, FileSpreadsheet, FileText,
+  CalendarDays, KeyRound, Sparkles, ArrowRight,
+} from "lucide-react";
 
-import { useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
-
-const MermaidDiagram = dynamic(() => import("./MermaidDiagram"), { ssr: false });
-
-type Mode = "job_name" | "table_name" | "folder_name";
-type Phase = "idle" | "submitting" | "running" | "success" | "error";
-
-interface Flow {
-  output_path?: string;
-  xml_filename?: string;
-  input_mode?: string;
-  direction?: string;
-  folder_filter?: string;
-  input_jobs?: string[];
-  jobs?: number;
-  containers?: number;
-  nodes?: number;
-  edges?: number;
-  omitted?: number;
-  llm_calls?: number;
-  mermaid?: string;
-  mermaid_url?: string;
+interface Tool {
+  href: string; title: string; desc: string; icon: any; soon?: boolean;
 }
 
-interface StatusResp {
-  life_cycle_state?: string;
-  result_state?: string;
-  message?: string;
-  runPageUrl?: string;
-  done?: boolean;
-  success?: boolean;
-  outputPath?: string | null;
-  outputError?: string | null;
-  flow?: Flow | null;
-  error?: string;
-}
+const TOOLS: Tool[] = [
+  { href: "/control-m", title: "Control-M Analysis", icon: Workflow,
+    desc: "Upload a workspace XML, run the lineage job, explore the dependency diagram, and download the Excel dashboard." },
+  { href: "#", title: "Drift Analysis", icon: GitCompareArrows, soon: true,
+    desc: "Compare lineage and container definitions across runs to surface what changed over time." },
+  { href: "#", title: "STM Generator", icon: FileSpreadsheet, soon: true,
+    desc: "Generate Source-to-Target Mappings for ingestion and derived tables." },
+  { href: "#", title: "DG / HLD Docs", icon: FileText, soon: true,
+    desc: "Auto-create Data Governance and High-Level Design documents." },
+  { href: "#", title: "Leave Tracker", icon: CalendarDays, soon: true,
+    desc: "Track team leave and availability at a glance." },
+  { href: "#", title: "Access Requests", icon: KeyRound, soon: true,
+    desc: "Shortcuts and import links for common Rogers access requests." },
+  { href: "#", title: "Fun Zone", icon: Sparkles, soon: true,
+    desc: "A few team activities and utilities — coming along the way." },
+];
 
-export default function Page() {
-  // ── form state ────────────────────────────────────────────────────────────
-  const [xmlFilename, setXmlFilename] = useState("");
-  const [folderFilter, setFolderFilter] = useState("");
-  const [inputMode, setInputMode] = useState<Mode>("job_name");
-  const [jobNames, setJobNames] = useState("");
-  const [tableNames, setTableNames] = useState("");
-  const [tableMatchMode, setTableMatchMode] = useState("exact");
-  const [direction, setDirection] = useState("predecessor");
-  const [password, setPassword] = useState("");
-
-  // ── upload state ────────────────────────────────────────────────────────────
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadMsg, setUploadMsg] = useState("");
-  const [uploadErr, setUploadErr] = useState("");
-
-  // ── run state ───────────────────────────────────────────────────────────────
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [runId, setRunId] = useState<number | null>(null);
-  const [status, setStatus] = useState<StatusResp | null>(null);
-  const [error, setError] = useState("");
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
-
-  async function upload() {
-    if (!file) return;
-    setUploadErr(""); setUploadMsg(""); setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        headers: { "x-app-password": password },
-        body: fd,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload failed");
-      setXmlFilename(data.filename || "");
-      setUploadMsg(`Uploaded to ${data.path} (${fmtBytes(data.size)})`);
-    } catch (e: any) {
-      setUploadErr(e?.message || String(e));
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  async function submit() {
-    setError(""); setStatus(null); setRunId(null); setPhase("submitting");
-    try {
-      const res = await fetch("/api/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-app-password": password },
-        body: JSON.stringify({
-          xmlFilename, folderFilter, inputMode, jobNames, tableNames,
-          tableMatchMode, direction,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to start job");
-      setRunId(data.run_id);
-      setPhase("running");
-      startPolling(data.run_id);
-    } catch (e: any) {
-      setError(e?.message || String(e)); setPhase("error");
-    }
-  }
-
-  function startPolling(id: number) {
-    if (pollRef.current) clearInterval(pollRef.current);
-    const tick = async () => {
-      try {
-        const res = await fetch(`/api/status?runId=${id}`, { cache: "no-store" });
-        const data: StatusResp = await res.json();
-        if (!res.ok) throw new Error(data.error || "status error");
-        setStatus(data);
-        if (data.done) {
-          if (pollRef.current) clearInterval(pollRef.current);
-          setPhase(data.success ? "success" : "error");
-          if (!data.success) setError(data.message || data.result_state || "Job failed");
-        }
-      } catch (e: any) {
-        if (pollRef.current) clearInterval(pollRef.current);
-        setError(e?.message || String(e)); setPhase("error");
-      }
-    };
-    tick();
-    pollRef.current = setInterval(tick, 3000);
-  }
-
-  const busy = phase === "submitting" || phase === "running";
-  const life = status?.life_cycle_state || (phase === "submitting" ? "STARTING" : "");
-  const curStage = currentStage(phase, life);
-  const flow = status?.flow || null;
-
+export default function Dashboard() {
   return (
-    <div className="wrap">
-      <header className="header">
-        <div className="brand">
-          <RogersLogo />
-          <span className="rogers-word">ROGERS</span>
-          <span className="brand-divider" />
-          <span className="brand-tag">Data Engineering</span>
-        </div>
-        <div className="titles">
-          <h1>Control-M Lineage Analyzer</h1>
-          <p className="sub">
-            Upload a Control-M workspace export, run the Databricks lineage job, then explore the
-            dependency diagram and download the Excel dashboard.
-          </p>
-        </div>
-      </header>
+    <div className="page">
+      <div className="page-head">
+        <h1>Data Engineering Portal</h1>
+        <p className="sub">Self-service tools for the Rogers Data Engineering team. Pick a tool to get started.</p>
+      </div>
 
-      {/* ── 1 · Upload XML to the Volume ── */}
-      <section className="card">
-        <div className="card-head">
-          <span className="step-num">1</span>
-          <h2>Upload workspace XML</h2>
-        </div>
-        <p className="muted small">
-          The file is streamed straight into the Databricks input Volume — the job reads it by name,
-          no manual copy needed.
-        </p>
-
-        <div className="uploader">
-          <label className="filepick">
-            <input
-              type="file"
-              accept=".xml"
-              onChange={(e) => { setFile(e.target.files?.[0] || null); setUploadMsg(""); setUploadErr(""); }}
-            />
-            <span className="filepick-btn">Choose .xml file</span>
-            <span className="filepick-name">{file ? file.name : "No file selected"}</span>
-          </label>
-          <button className="btn" onClick={upload} disabled={!file || uploading}>
-            {uploading ? "Uploading…" : "⬆  Upload to Volume"}
-          </button>
-        </div>
-
-        {uploadMsg && <div className="note ok">✓ {uploadMsg}</div>}
-        {uploadErr && <div className="note err">⚠ {uploadErr}</div>}
-      </section>
-
-      {/* ── 2 · Parameters ── */}
-      <section className="card">
-        <div className="card-head">
-          <span className="step-num">2</span>
-          <h2>Run parameters</h2>
-        </div>
-        <div className="grid">
-          <div className="full">
-            <label>XML filename (no “.xml” needed)</label>
-            <input value={xmlFilename} onChange={(e) => setXmlFilename(e.target.value)}
-                   placeholder="e.g. MAZ_DRVD_APP_VST" />
-            <div className="hint">Auto-filled after upload, or type a file that already exists in the Volume.</div>
-          </div>
-
-          <div>
-            <label>Input mode</label>
-            <select value={inputMode} onChange={(e) => setInputMode(e.target.value as Mode)}>
-              <option value="job_name">job_name</option>
-              <option value="table_name">table_name</option>
-              <option value="folder_name">folder_name</option>
-            </select>
-          </div>
-
-          <div>
-            <label>Direction</label>
-            <select value={direction} onChange={(e) => setDirection(e.target.value)}>
-              <option value="predecessor">predecessor</option>
-              <option value="successor">successor</option>
-              <option value="both">both</option>
-            </select>
-          </div>
-
-          {inputMode === "job_name" && (
+      <div className="tool-grid">
+        {TOOLS.map((t) => {
+          const Icon = t.icon;
+          const card = (
             <>
-              <div className="full">
-                <label>Job name(s) — comma separated</label>
-                <input value={jobNames} onChange={(e) => setJobNames(e.target.value)}
-                       placeholder="JOB_A, JOB_B" />
+              <div className="tool-ico"><Icon size={22} /></div>
+              <div className="tool-body">
+                <div className="tool-title">
+                  {t.title}
+                  {t.soon && <span className="soon">soon</span>}
+                </div>
+                <p className="tool-desc">{t.desc}</p>
               </div>
-              <div className="full">
-                <label>Folder filter (blank = all folders)</label>
-                <input value={folderFilter} onChange={(e) => setFolderFilter(e.target.value)} placeholder="(all)" />
-              </div>
+              {!t.soon && <ArrowRight size={18} className="tool-arrow" />}
             </>
-          )}
-
-          {inputMode === "table_name" && (
-            <>
-              <div>
-                <label>Table name(s) — comma separated</label>
-                <input value={tableNames} onChange={(e) => setTableNames(e.target.value)}
-                       placeholder="MY_TABLE" />
-              </div>
-              <div>
-                <label>Table match mode</label>
-                <select value={tableMatchMode} onChange={(e) => setTableMatchMode(e.target.value)}>
-                  <option value="exact">exact</option>
-                  <option value="contains">contains</option>
-                </select>
-              </div>
-              <div className="full">
-                <label>Folder filter (blank = all folders)</label>
-                <input value={folderFilter} onChange={(e) => setFolderFilter(e.target.value)} placeholder="(all)" />
-              </div>
-            </>
-          )}
-
-          {inputMode === "folder_name" && (
-            <div className="full">
-              <label>Folder (seed) — required</label>
-              <input value={folderFilter} onChange={(e) => setFolderFilter(e.target.value)}
-                     placeholder="e.g. BIDW_MAZ_DRVD_APP_VST_PRD" />
-              <div className="hint">In folder_name mode every job in this folder is used as the seed.</div>
-            </div>
-          )}
-
-          <div className="full">
-            <label>App password (only if the deployment is gated)</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                   placeholder="leave blank if not set" />
-          </div>
-        </div>
-
-        <div className="row" style={{ marginTop: 20 }}>
-          <button className="btn primary" onClick={submit} disabled={busy}>
-            {busy ? "Running…" : "▶  Run analysis"}
-          </button>
-          {runId && <span className="muted mono">run_id: {runId}</span>}
-        </div>
-      </section>
-
-      {/* ── 3 · Status ── */}
-      {phase !== "idle" && (
-        <section className="card">
-          <div className="card-head">
-            <span className="step-num">3</span>
-            <h2>Run status</h2>
-          </div>
-          <div className="status">
-            <span className={`dot ${dotClass(phase)}`} />
-            <div style={{ flex: 1 }}>
-              <div className="row" style={{ gap: 10 }}>
-                <strong>{prettyPhase(phase, life)}</strong>
-                {status?.result_state && (
-                  <span className={`badge ${status.success ? "ok" : "err"}`}>{status.result_state}</span>
-                )}
-                {!status?.result_state && busy && <span className="badge run">{life || "STARTING"}</span>}
-              </div>
-              {status?.message && <div className="muted small" style={{ marginTop: 4 }}>{status.message}</div>}
-            </div>
-            {status?.runPageUrl && (
-              <a className="link" href={status.runPageUrl} target="_blank" rel="noreferrer">Open in Databricks ↗</a>
-            )}
-          </div>
-
-          <ol className="stepper">
-            {STAGES.map((label, i) => {
-              const cls = stageClass(phase, curStage, i);
-              return (
-                <li key={label} className={cls}>
-                  <span className="step-ico">
-                    {cls === "done" ? "✓" : cls === "err" ? "✕" : i + 1}
-                  </span>
-                  <span className="step-name">{label}</span>
-                </li>
-              );
-            })}
-          </ol>
-
-          <div className="stage-hint">
-            {phase === "success" ? (
-              <>All steps completed ✓</>
-            ) : phase === "error" ? (
-              <>Failed at <b>{STAGES[curStage]}</b></>
-            ) : (
-              <>
-                Now: <b>{STAGES[curStage]}</b>
-                {curStage < STAGES.length - 1 && <> · Next: <b>{STAGES[curStage + 1]}</b></>}
-              </>
-            )}
-          </div>
-
-          {error && <div className="note err" style={{ marginTop: 14 }}>⚠ {error}</div>}
-        </section>
-      )}
-
-      {/* ── 4 · Results: flow summary + diagram + download ── */}
-      {phase === "success" && (
-        <section className="card">
-          <div className="card-head">
-            <span className="step-num">✓</span>
-            <h2>Lineage results</h2>
-          </div>
-
-          {flow && (
-            <div className="stats">
-              <Stat label="Jobs" value={flow.jobs} />
-              <Stat label="Containers" value={flow.containers} />
-              <Stat label="Diagram nodes" value={flow.nodes} />
-              <Stat label="Edges" value={flow.edges} />
-            </div>
-          )}
-
-          {flow && (
-            <div className="meta">
-              <MetaRow k="Mode" v={flow.input_mode} />
-              <MetaRow k="Direction" v={flow.direction} />
-              <MetaRow k="Folder" v={flow.folder_filter || "(all)"} />
-              <MetaRow k="Seed jobs" v={(flow.input_jobs || []).join(", ") || "—"} />
-              {!!flow.omitted && <MetaRow k="Omitted (truncated)" v={String(flow.omitted)} />}
-            </div>
-          )}
-
-          {flow?.mermaid ? (
-            <div className="diagram-block">
-              <div className="row" style={{ justifyContent: "space-between" }}>
-                <h3 className="block-title">Dependency diagram</h3>
-                {flow.mermaid_url && (
-                  <a className="link" href={flow.mermaid_url} target="_blank" rel="noreferrer">
-                    Open in Mermaid Live ↗
-                  </a>
-                )}
-              </div>
-              <div className="diagram">
-                <MermaidDiagram code={flow.mermaid} />
-              </div>
-              <details className="source">
-                <summary>Show Mermaid source</summary>
-                <pre className="mono">{flow.mermaid}</pre>
-              </details>
-            </div>
-          ) : (
-            <div className="muted small" style={{ marginTop: 8 }}>
-              No diagram was returned for this run.
-            </div>
-          )}
-
-          {status?.outputPath ? (
-            <div className="download-block">
-              <a className="btn download"
-                 href={`/api/download?path=${encodeURIComponent(status.outputPath)}`}>
-                ⬇  Download Excel dashboard
-              </a>
-              <div className="outpath mono">{status.outputPath}</div>
-            </div>
-          ) : (
-            <div className="muted small" style={{ marginTop: 14 }}>
-              Job succeeded but no output path was returned.
-              {status?.outputError ? <div className="err-text">{status.outputError}</div> : null}
-            </div>
-          )}
-        </section>
-      )}
-
-      <footer className="footer">Control-M Analyzer · Databricks Jobs API · deployed on Vercel</footer>
+          );
+          if (t.soon) return <div key={t.title} className="tool-card disabled">{card}</div>;
+          return <Link key={t.title} href={t.href} className="tool-card">{card}</Link>;
+        })}
+      </div>
     </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value?: number }) {
-  return (
-    <div className="stat">
-      <div className="stat-val">{value ?? "—"}</div>
-      <div className="stat-lbl">{label}</div>
-    </div>
-  );
-}
-function MetaRow({ k, v }: { k: string; v?: string }) {
-  return (
-    <div className="meta-row">
-      <span className="meta-k">{k}</span>
-      <span className="meta-v">{v || "—"}</span>
-    </div>
-  );
-}
-
-function fmtBytes(n?: number) {
-  if (!n && n !== 0) return "";
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
-function dotClass(phase: Phase) {
-  if (phase === "running" || phase === "submitting") return "run";
-  if (phase === "success") return "ok";
-  if (phase === "error") return "err";
-  return "idle";
-}
-function prettyPhase(phase: Phase, life: string) {
-  if (phase === "submitting") return "Starting job…";
-  if (phase === "success") return "Completed";
-  if (phase === "error") return "Failed";
-  if (phase === "running") return `Running (${life || "…"})`;
-  return "Idle";
-}
-// Stages shown in the run-status stepper, in order. Mapped from the Databricks
-// run life-cycle so the user can see what's happening now and what comes next.
-const STAGES = ["Queued", "Running", "Finalizing", "Completed"] as const;
-
-function currentStage(phase: Phase, life: string): number {
-  if (phase === "success") return 3;
-  if (phase === "submitting") return 0;
-  if (phase === "running") {
-    if (life === "RUNNING") return 1;
-    if (life === "TERMINATING") return 2;
-    return 0; // PENDING / QUEUED / BLOCKED / WAITING_FOR_RETRY
-  }
-  if (phase === "error") {
-    if (life === "TERMINATING") return 2;
-    return 1; // assume it failed while running
-  }
-  return 0;
-}
-
-function stageClass(phase: Phase, cur: number, i: number): "done" | "active" | "err" | "todo" {
-  if (phase === "success") return "done";
-  if (phase === "error") return i < cur ? "done" : i === cur ? "err" : "todo";
-  return i < cur ? "done" : i === cur ? "active" : "todo";
-}
-
-// Rogers brand swirl (inline SVG so it scales crisply and needs no asset).
-function RogersLogo() {
-  return (
-    <span className="rogers-mark" aria-label="Rogers">
-      <svg viewBox="0 0 48 48" role="img" aria-hidden="true">
-        <g fill="#DA291C">
-          <path
-            d="M24 24 C19 13 27 4 39 9 C35 15 30 19 26 24 Z"
-            transform="rotate(0 24 24)"
-          />
-          <path
-            d="M24 24 C19 13 27 4 39 9 C35 15 30 19 26 24 Z"
-            transform="rotate(120 24 24)"
-          />
-          <path
-            d="M24 24 C19 13 27 4 39 9 C35 15 30 19 26 24 Z"
-            transform="rotate(240 24 24)"
-          />
-        </g>
-      </svg>
-    </span>
   );
 }
