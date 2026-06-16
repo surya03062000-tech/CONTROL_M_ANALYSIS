@@ -3,9 +3,9 @@
    Light, enterprise-grade surface with an indigo/violet accent system.
    ───────────────────────────────────────────────────────────────────────── */
 :root {
-  --bg:        #eef1f8;
-  --bg-grad-a: #e7ecfb;
-  --bg-grad-b: #f4f6fc;
+  --bg:        #f1f2f5;
+  --bg-grad-a: #fbeae8;
+  --bg-grad-b: #f7f8fb;
   --surface:   #ffffff;
   --surface-2: #f7f9fd;
   --line:      #e2e7f2;
@@ -15,10 +15,10 @@
   --text-2:    #475472;
   --muted:     #6b7896;
 
-  --accent:    #4f46e5;   /* indigo  */
-  --accent-2:  #7c3aed;   /* violet  */
-  --accent-3:  #2563eb;   /* blue    */
-  --accent-soft: #eef0ff;
+  --accent:    #DA291C;   /* Rogers red       */
+  --accent-2:  #A4130B;   /* deep Rogers red  */
+  --accent-3:  #E4002B;   /* bright red       */
+  --accent-soft: #fdeceb;
 
   --ok:    #16a34a;
   --ok-bg: #e9f8ef;
@@ -30,7 +30,7 @@
   --radius-sm:11px;
   --shadow:   0 1px 2px rgba(20,30,60,.05), 0 12px 30px rgba(30,40,90,.08);
   --shadow-sm:0 1px 2px rgba(20,30,60,.06);
-  --ring:     0 0 0 3px rgba(79,70,229,.16);
+  --ring:     0 0 0 3px rgba(218,41,28,.16);
   --font: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
   --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", Consolas, monospace;
 }
@@ -45,23 +45,24 @@ html, body {
   -webkit-font-smoothing: antialiased;
   background:
     radial-gradient(900px 500px at 90% -10%, var(--bg-grad-a) 0%, transparent 60%),
-    radial-gradient(800px 500px at -10% 0%, #f0e9fb 0%, transparent 55%),
+    radial-gradient(800px 500px at -10% 0%, #fdeceb 0%, transparent 55%),
     linear-gradient(180deg, var(--bg-grad-b), var(--bg));
   background-attachment: fixed;
 }
 
 .wrap { max-width: 1000px; margin: 0 auto; padding: 40px 22px 72px; }
 
-/* ── Header ─────────────────────────────────────────────────────────────── */
-.header { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 28px; }
-.header .logo {
-  width: 52px; height: 52px; border-radius: 14px; flex: 0 0 auto;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  display: grid; place-items: center; font-size: 26px;
-  box-shadow: 0 8px 20px rgba(79,70,229,.35);
-}
-.header h1 {
-  font-size: 25px; margin: 2px 0 4px; letter-spacing: -.4px; font-weight: 800;
+/* ── Header / Rogers brand ──────────────────────────────────────────────── */
+.header { display: flex; flex-direction: column; gap: 16px; margin-bottom: 28px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.rogers-mark { width: 40px; height: 40px; display: grid; place-items: center; flex: 0 0 auto; filter: drop-shadow(0 4px 8px rgba(218,41,28,.28)); }
+.rogers-mark svg { width: 100%; height: 100%; }
+.rogers-word { font-size: 28px; font-weight: 900; letter-spacing: .5px; color: var(--accent); line-height: 1; }
+.brand-divider { width: 1px; height: 24px; background: var(--line-2); margin: 0 4px; }
+.brand-tag { font-size: 12.5px; font-weight: 600; color: var(--muted); letter-spacing: .3px; text-transform: uppercase; }
+
+.titles h1 {
+  font-size: 25px; margin: 0 0 6px; letter-spacing: -.4px; font-weight: 800;
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
@@ -82,7 +83,7 @@ html, body {
   width: 28px; height: 28px; border-radius: 9px; flex: 0 0 auto;
   display: grid; place-items: center; font-size: 14px; font-weight: 800; color: #fff;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  box-shadow: 0 4px 10px rgba(79,70,229,.3);
+  box-shadow: 0 4px 10px rgba(218,41,28,.3);
 }
 
 /* ── Form grid ──────────────────────────────────────────────────────────── */
@@ -107,10 +108,10 @@ input:focus, select:focus { border-color: var(--accent); background: #fff; box-s
   appearance: none; border: 0; cursor: pointer; font-weight: 700; font-size: 14.5px;
   padding: 12px 20px; border-radius: var(--radius-sm); color: #fff;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  box-shadow: 0 6px 16px rgba(79,70,229,.28);
+  box-shadow: 0 6px 16px rgba(218,41,28,.28);
   transition: transform .06s ease, filter .15s ease, box-shadow .15s ease;
 }
-.btn:hover { filter: brightness(1.06); box-shadow: 0 8px 20px rgba(79,70,229,.34); }
+.btn:hover { filter: brightness(1.06); box-shadow: 0 8px 20px rgba(218,41,28,.34); }
 .btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: .5; cursor: not-allowed; filter: grayscale(.25); box-shadow: none; }
 .btn.primary { font-size: 15px; padding: 13px 24px; }
@@ -150,10 +151,40 @@ input:focus, select:focus { border-color: var(--accent); background: #fff; box-s
 .badge.ok  { background: var(--ok-bg);  color: #166534; }
 .badge.err { background: var(--err-bg); color: #991b1b; }
 
-.steps { display: flex; gap: 8px; margin-top: 16px; }
-.step { flex: 1; height: 7px; border-radius: 999px; background: var(--line-2); overflow: hidden; transition: background .2s ease; }
-.step.active { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
-.step.done   { background: var(--ok); }
+/* ── Stepper: current stage + what's next ───────────────────────────────── */
+.stepper { list-style: none; display: flex; padding: 0; margin: 20px 0 0; }
+.stepper li { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; }
+.stepper li::before {
+  content: ""; position: absolute; top: 15px; left: -50%; width: 100%; height: 3px;
+  background: var(--line-2); z-index: 0; border-radius: 999px;
+}
+.stepper li:first-child::before { display: none; }
+.stepper li.done::before { background: var(--accent); }
+.stepper li.active::before { background: linear-gradient(90deg, var(--accent), var(--line-2)); }
+.stepper li.err::before { background: var(--err); }
+
+.step-ico {
+  position: relative; z-index: 1; width: 32px; height: 32px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 13px; font-weight: 800;
+  background: var(--surface); border: 2px solid var(--line-2); color: var(--muted);
+  transition: all .2s ease;
+}
+.stepper li.done .step-ico { background: var(--accent); border-color: var(--accent); color: #fff; }
+.stepper li.active .step-ico { border-color: var(--accent); color: var(--accent); background: #fff; animation: ringPulse 1.5s infinite; }
+.stepper li.err .step-ico { background: var(--err); border-color: var(--err); color: #fff; }
+@keyframes ringPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(218,41,28,.40); }
+  70%  { box-shadow: 0 0 0 9px rgba(218,41,28,0); }
+  100% { box-shadow: 0 0 0 0 rgba(218,41,28,0); }
+}
+
+.step-name { font-size: 12px; margin-top: 9px; color: var(--muted); font-weight: 600; text-align: center; }
+.stepper li.done .step-name { color: var(--text-2); }
+.stepper li.active .step-name { color: var(--accent); }
+.stepper li.err .step-name { color: var(--err); }
+
+.stage-hint { margin-top: 16px; text-align: center; font-size: 13px; color: var(--text-2); }
+.stage-hint b { color: var(--accent); font-weight: 700; }
 
 /* ── Results: stat tiles ────────────────────────────────────────────────── */
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 18px; }
