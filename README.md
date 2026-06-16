@@ -105,19 +105,33 @@ Then add the same env vars in **Vercel → Project → Settings → Environment 
 
 ## Files
 
+The app is structured as a small **portal**: the dashboard (`/`) lists tools, and the
+Control-M analyzer lives at **`/control-m`**. Other tools (Drift Analysis, STM, docs,
+etc.) are stubbed as "coming soon" cards for the roadmap.
+
 ```
 app/
-  page.tsx              UI: upload + form + live status + diagram + download
-  MermaidDiagram.tsx    client component that renders the Mermaid diagram in-browser
-  layout.tsx, globals.css
+  layout.tsx              root layout: Inter font, metadata, theme bootstrap, AppShell
+  page.tsx                Dashboard — tool launcher cards
+  icon.svg                Rogers favicon
+  globals.css             full theme (light + dark, Rogers red)
+  control-m/page.tsx      Analyzer: drag-drop upload, validation, run + timer + cancel,
+                          refresh-safe runs, results, and recent-outputs history
+  MermaidDiagram.tsx      diagram viewer: pan/zoom, fullscreen, PNG/SVG export, node search
+  components/
+    AppShell.tsx          sidebar nav + topbar (+ ToastProvider)
+    ThemeToggle.tsx       light/dark toggle (persisted)
+    Toast.tsx             toast notifications
   api/
-    upload/route.ts     POST → Files API PUT of the XML into the input Volume
-    run/route.ts        POST → jobs/run-now (maps form → widget params)
-    status/route.ts     GET  → runs/get (+ runs/get-output; parses the JSON exit payload)
-    download/route.ts   GET  → Files API stream of the .xlsx
-lib/databricks.ts       server-only Databricks REST client (run / status / upload / download)
-databricks-job.json     job definition for the CLI
-.env.example            env var template
+    upload/route.ts       POST → Files API PUT of the XML into the input Volume
+    run/route.ts          POST → jobs/run-now (maps form → widget params)
+    status/route.ts       GET  → runs/get (+ runs/get-output; parses the JSON exit payload)
+    cancel/route.ts       POST → jobs/runs/cancel
+    outputs/route.ts      GET  → recent .xlsx outputs in the Volume (run history)
+    download/route.ts     GET  → Files API stream of the .xlsx
+lib/databricks.ts         server-only Databricks REST client (run/status/upload/cancel/list/download)
+databricks-job.json       job definition for the CLI
+.env.example              env var template
 ```
 
 ## Notes / troubleshooting
