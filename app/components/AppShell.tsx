@@ -8,6 +8,7 @@ import {
   CalendarDays, KeyRound, Gamepad2, Menu, X, ExternalLink,
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
+import InstallButton from "./InstallButton";
 import { ToastProvider } from "./Toast";
 
 interface NavItem { href: string; label: string; icon: any; soon?: boolean; external?: boolean; }
@@ -50,6 +51,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <span className="brand-tag">Data Engineering</span>
             </div>
           </div>
+          <div className="side-tagline">Powering D&amp;AI Teams, One Tool at a Time</div>
 
           <nav className="side-nav">
             {NAV.map((n) => {
@@ -87,7 +89,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <button className="icon-btn menu-btn" aria-label="Menu" onClick={() => setOpen((v) => !v)}>
               {open ? <X size={18} /> : <Menu size={18} />}
             </button>
+            <span className="app-tagline">Powering D&amp;AI Teams, One Tool at a Time</span>
             <div className="topbar-spacer" />
+            <InstallButton />
             <ThemeToggle />
           </header>
           <main className="content">{children}</main>
