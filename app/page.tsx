@@ -1,16 +1,18 @@
 import Link from "next/link";
 import {
   Workflow, GitCompareArrows, FileSpreadsheet, FileText,
-  CalendarDays, KeyRound, Sparkles, ArrowRight,
+  CalendarDays, KeyRound, Gamepad2, ArrowRight, ExternalLink,
 } from "lucide-react";
 
 interface Tool {
-  href: string; title: string; desc: string; icon: any; soon?: boolean;
+  href: string; title: string; desc: string; icon: any; soon?: boolean; external?: boolean;
 }
 
 const TOOLS: Tool[] = [
   { href: "/control-m", title: "Control-M Analysis", icon: Workflow,
     desc: "Upload a workspace XML, run the lineage job, explore the dependency diagram, and download the Excel dashboard." },
+  { href: "https://uno-game-jsys.onrender.com/", title: "Fun Zone — UNO", icon: Gamepad2, external: true,
+    desc: "Take a break and play a multiplayer game of UNO with the team. Opens in a new tab." },
   { href: "#", title: "Drift Analysis", icon: GitCompareArrows, soon: true,
     desc: "Compare lineage and container definitions across runs to surface what changed over time." },
   { href: "#", title: "STM Generator", icon: FileSpreadsheet, soon: true,
@@ -21,8 +23,6 @@ const TOOLS: Tool[] = [
     desc: "Track team leave and availability at a glance." },
   { href: "#", title: "Access Requests", icon: KeyRound, soon: true,
     desc: "Shortcuts and import links for common Rogers access requests." },
-  { href: "#", title: "Fun Zone", icon: Sparkles, soon: true,
-    desc: "A few team activities and utilities — coming along the way." },
 ];
 
 export default function Dashboard() {
@@ -46,10 +46,11 @@ export default function Dashboard() {
                 </div>
                 <p className="tool-desc">{t.desc}</p>
               </div>
-              {!t.soon && <ArrowRight size={18} className="tool-arrow" />}
+              {!t.soon && (t.external ? <ExternalLink size={18} className="tool-arrow" /> : <ArrowRight size={18} className="tool-arrow" />)}
             </>
           );
           if (t.soon) return <div key={t.title} className="tool-card disabled">{card}</div>;
+          if (t.external) return <a key={t.title} href={t.href} target="_blank" rel="noreferrer" className="tool-card">{card}</a>;
           return <Link key={t.title} href={t.href} className="tool-card">{card}</Link>;
         })}
       </div>
