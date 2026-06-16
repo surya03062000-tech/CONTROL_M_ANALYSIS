@@ -16,6 +16,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     // Map the form fields → notebook widget names (must match the notebook's widgets).
+    // 08_max_depth is no longer a UI field; the job keeps the widget, so we always
+    // send "0" (= unlimited), the notebook's own default.
     const params: NotebookParams = {
       "01_xml_filename": String(body.xmlFilename || "").trim(),
       "02_folder_filter": String(body.folderFilter || "").trim(),
@@ -24,7 +26,7 @@ export async function POST(req: NextRequest) {
       "05_input_table_names": String(body.tableNames || "").trim(),
       "06_table_match_mode": String(body.tableMatchMode || "exact").trim(),
       "07_direction": String(body.direction || "predecessor").trim(),
-      "08_max_depth": String(body.maxDepth ?? "0").trim(),
+      "08_max_depth": "0",
     };
 
     if (!params["01_xml_filename"]) {
@@ -35,6 +37,9 @@ export async function POST(req: NextRequest) {
     }
     if (params["03_input_mode"] === "table_name" && !params["05_input_table_names"]) {
       return NextResponse.json({ error: "Table name(s) required in table_name mode." }, { status: 400 });
+    }
+    if (params["03_input_mode"] === "folder_name" && !params["02_folder_filter"]) {
+      return NextResponse.json({ error: "Folder is required in folder_name mode." }, { status: 400 });
     }
 
     const { run_id } = await runNow(params);

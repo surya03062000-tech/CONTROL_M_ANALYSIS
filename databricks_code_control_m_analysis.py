@@ -2785,6 +2785,7 @@ def run():
     print(f"[Diff] vs prev run: +{len(diff_info['added'])} ✎{len(diff_info['changed'])} -{len(diff_info['removed'])}")
     health = compute_health_metrics(chain_containers) if CONFIG.get("validation_enabled") else {}
     mermaid_text = ""
+    n_nodes = n_edges = n_omitted = 0
     if CONFIG.get("mermaid_enabled"):
         mermaid_text, n_nodes, n_edges, n_omitted = build_mermaid(
             rows, pred, succ, input_jobs,
@@ -2837,9 +2838,28 @@ def run():
     print(f"  LLM calls: {llm_calls}")
     print(f"  Output: {output_path}")
     print("═" * 65)
-    return output_path
 
-output_file = run()
+    # Return a rich result so an external trigger (the Vercel website) can render the
+    # Mermaid diagram + a flow summary AND download the .xlsx — all from runs/get-output.
+    return {
+        "output_path":   output_path,
+        "xml_filename":  xml_base,
+        "input_mode":    input_mode,
+        "direction":     direction,
+        "folder_filter": folder_filter,
+        "input_jobs":    sorted(input_jobs),
+        "jobs":          len(rows),
+        "containers":    len(chain_containers),
+        "nodes":         n_nodes,
+        "edges":         n_edges,
+        "omitted":       n_omitted,
+        "llm_calls":     llm_calls,
+        "mermaid":       mermaid_text,
+        "mermaid_url":   mermaid_live_url(mermaid_text) if mermaid_text else "",
+    }
+
+run_result = run()
+output_file = run_result.get("output_path") if isinstance(run_result, dict) else run_result
 
 # COMMAND ----------
 
@@ -2851,11 +2871,15 @@ output_file = run()
 # DBTITLE 1,Return output path to the Job run
 # When run as a Databricks Job, dbutils.notebook.exit(value) makes `value` available at
 #   GET /api/2.1/jobs/runs/get-output?run_id=...  →  notebook_output.result
-# The website reads that path and streams the file via the Files API.
+# We return a JSON string holding the output .xlsx path, the Mermaid diagram source +
+# live URL, and a small flow summary. The website parses this to render the diagram,
+# show the flow details, and stream the .xlsx via the Files API.
+# (Back-compat: if it's ever a plain string, the website treats it as the output path.)
 try:
-    if dbutils is not None and output_file:
-        dbutils.notebook.exit(str(output_file))
+    if dbutils is not None and run_result:
+        import json as _json
+        dbutils.notebook.exit(_json.dumps(run_result, default=str))
     else:
-        print(f"[Exit] output_file = {output_file}")
+        print(f"[Exit] run_result = {run_result}")
 except Exception as _e:
     print(f"[Exit] dbutils.notebook.exit skipped: {_e}")

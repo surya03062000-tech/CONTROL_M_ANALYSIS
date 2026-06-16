@@ -2,18 +2,21 @@
 
 A small Next.js app you deploy on **Vercel**. It lets anyone:
 
-1. Fill in the same parameters as the notebook widgets,
-2. **Trigger** the Control-M Analyzer Databricks **Job**,
-3. Watch the **run status** live on the page,
-4. **Download** the generated `.xlsx` once the run succeeds.
+1. **Upload** a Control-M workspace XML straight into the Databricks input Volume,
+2. Fill in the same parameters as the notebook widgets (`job_name` / `table_name` / `folder_name`),
+3. **Trigger** the Control-M Analyzer Databricks **Job**,
+4. Watch the **run status** live on the page,
+5. **Explore the dependency diagram** (rendered Mermaid) + flow summary once it succeeds,
+6. **Download** the generated `.xlsx` dashboard.
 
 The Databricks token stays on the server (API routes only) — it is never sent to the browser.
 
 ```
-Browser ──POST /api/run──▶  Databricks  jobs/run-now
+Browser ──POST /api/upload──▶ Databricks Files API  (PUT into the input Volume)
+        ──POST /api/run────▶  Databricks  jobs/run-now
    ▲                                   │ run_id
    │  poll /api/status ◀──────────────┘
-   │        └─ runs/get  +  runs/get-output (exit value = output path)
+   │        └─ runs/get  +  runs/get-output (exit value = JSON: path + Mermaid + summary)
    └──GET /api/download──▶ Databricks  Files API  ──▶  streams the .xlsx
 ```
 
@@ -24,11 +27,13 @@ Browser ──POST /api/run──▶  Databricks  jobs/run-now
 The website triggers an **existing** job by its numeric ID, so create it first.
 
 ### Option A — Databricks UI
-1. Upload / import `v8_github_source.py` into your workspace as a notebook.
+1. Upload / import `databricks_code_control_m_analysis.py` into your workspace as a notebook.
 2. **Workflows → Create Job** → add a **Notebook** task pointing at that notebook.
 3. Under **Parameters**, add these keys (values can stay empty — the website overrides them):
    `01_xml_filename, 02_folder_filter, 03_input_mode, 04_input_job_names,`
    `05_input_table_names, 06_table_match_mode, 07_direction, 08_max_depth`
+   `03_input_mode` accepts `job_name`, `table_name`, or `folder_name`. `08_max_depth` is no
+   longer exposed in the UI — the website always sends `0` (unlimited).
 4. Pick a cluster, **Create**, then copy the **Job ID** (top-right of the job page).
 
 ### Option B — Databricks CLI
@@ -38,16 +43,18 @@ databricks jobs create --json @databricks-job.json
 # → { "job_id": 123456789012345 }   ← copy this
 ```
 
-> The notebook already ends with `dbutils.notebook.exit(output_file)`, so the job run
-> returns the exact output `.xlsx` path. The website reads it via `runs/get-output`.
+> The notebook ends with `dbutils.notebook.exit(<json>)`, returning the output `.xlsx` path,
+> the Mermaid diagram source + live URL, and a small flow summary. The website reads this via
+> `runs/get-output` to render the diagram and download the file. (A bare path string still works.)
 
 ---
 
 ## 2. Get a Databricks token
 
 User Settings → **Developer → Access tokens → Generate**. The identity needs:
-- permission to **run** the job, and
-- **read** on the output Volume (`/Volumes/edl_qa/qa_agent/control_m`) for the Files API.
+- permission to **run** the job,
+- **read** on the output Volume (`/Volumes/edl_qa/qa_agent/control_m`) for downloads, and
+- **write** on the input Volume (same path by default) so the website can upload the XML.
 
 (For production, a **Service Principal** OAuth token is preferable to a personal PAT.)
 
@@ -63,9 +70,11 @@ Copy `.env.example` → `.env.local` and fill in:
 | `DATABRICKS_TOKEN` | `dapi...` |
 | `DATABRICKS_JOB_ID` | `123456789012345` |
 | `OUTPUT_VOLUME` | `/Volumes/edl_qa/qa_agent/control_m` |
+| `INPUT_VOLUME` | `/Volumes/edl_qa/qa_agent/control_m` *(where uploads land; defaults to `OUTPUT_VOLUME`)* |
 | `APP_PASSWORD` | *(optional)* a shared password to gate the UI |
 
 `OUTPUT_VOLUME` **must match** `CONFIG["output_volume"]` in the notebook (used to sandbox downloads).
+`INPUT_VOLUME` **must match** `CONFIG["xml_folder"]` (where the notebook reads the XML from).
 
 ---
 
@@ -98,21 +107,27 @@ Then add the same env vars in **Vercel → Project → Settings → Environment 
 
 ```
 app/
-  page.tsx              UI: form + live status + download button
+  page.tsx              UI: upload + form + live status + diagram + download
+  MermaidDiagram.tsx    client component that renders the Mermaid diagram in-browser
   layout.tsx, globals.css
   api/
+    upload/route.ts     POST → Files API PUT of the XML into the input Volume
     run/route.ts        POST → jobs/run-now (maps form → widget params)
-    status/route.ts     GET  → runs/get (+ runs/get-output on success)
+    status/route.ts     GET  → runs/get (+ runs/get-output; parses the JSON exit payload)
     download/route.ts   GET  → Files API stream of the .xlsx
-lib/databricks.ts       server-only Databricks REST client
+lib/databricks.ts       server-only Databricks REST client (run / status / upload / download)
 databricks-job.json     job definition for the CLI
 .env.example            env var template
 ```
 
 ## Notes / troubleshooting
 - **401 from Databricks** → token expired or lacks job/Files permission.
+- **Upload fails (403/404)** → the token needs **write** on `INPUT_VOLUME` and the Files API
+  (`/api/2.0/fs/files`) must be enabled for the Volume.
 - **Download 403 “Path not allowed”** → the output path is outside `OUTPUT_VOLUME`.
-- **Job succeeds but no download button** → the notebook didn’t hit `dbutils.notebook.exit`
-  (check the run’s logs); the path comes from `runs/get-output`.
+- **Job succeeds but no diagram / download** → the notebook didn’t hit `dbutils.notebook.exit`
+  (check the run’s logs); the path + diagram come from `runs/get-output`.
+- **Diagram won’t render in-browser** → use the **Open in Mermaid Live** link instead; very large
+  graphs are truncated by `CONFIG["mermaid_max_nodes"]` in the notebook.
 - **Files API 404** → confirm the workspace has Unity Catalog **Volumes** Files API enabled
   and the path exists.
