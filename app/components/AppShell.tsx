@@ -95,6 +95,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <ThemeToggle />
           </header>
           <main className="content">{children}</main>
+          <footer className="app-foot">
+            Powered by <strong>Surya Alagarsamy</strong>
+          </footer>
         </div>
 
         <button className="scrim" aria-hidden={!open} tabIndex={-1} onClick={() => setOpen(false)} />
