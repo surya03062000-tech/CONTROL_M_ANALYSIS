@@ -5,6 +5,13 @@ const HOST = (process.env.DATABRICKS_HOST || "").replace(/\/+$/, "");
 const TOKEN = process.env.DATABRICKS_TOKEN || "";
 const JOB_ID = process.env.DATABRICKS_JOB_ID || "";
 const OUTPUT_VOLUME = (process.env.OUTPUT_VOLUME || "").replace(/\/+$/, "");
+// Volume folder the notebook reads its XML from (CONFIG["xml_folder"]). Uploads land here.
+// Falls back to OUTPUT_VOLUME so a single-folder setup still works out of the box.
+const INPUT_VOLUME = (process.env.INPUT_VOLUME || process.env.OUTPUT_VOLUME || "").replace(/\/+$/, "");
+
+export function getInputVolume(): string {
+  return INPUT_VOLUME;
+}
 
 export function assertConfig() {
   const missing: string[] = [];
@@ -94,4 +101,27 @@ export async function listOutputs(): Promise<Array<{ path: string; name: string 
 export async function downloadFile(absPath: string): Promise<Response> {
   assertConfig();
   return dbx(`/api/2.0/fs/files${encodePath(absPath)}`, { method: "GET" });
+}
+
+// Upload (PUT) a file straight into the input Volume via the Files API.
+// The notebook then reads it by filename — no manual copy into the workspace needed.
+export async function uploadFile(
+  filename: string,
+  data: Buffer | Uint8Array
+): Promise<{ path: string }> {
+  assertConfig();
+  if (!INPUT_VOLUME) {
+    throw new Error("INPUT_VOLUME (or OUTPUT_VOLUME) is not configured — cannot upload.");
+  }
+  // Strip any path components a browser might send; keep it a plain filename.
+  const safeName = filename.replace(/^.*[\\/]/, "").trim();
+  if (!safeName) throw new Error("Invalid filename.");
+  const absPath = `${INPUT_VOLUME}/${safeName}`;
+  const res = await dbx(`/api/2.0/fs/files${encodePath(absPath)}?overwrite=true`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: data,
+  });
+  if (!res.ok) throw new Error(`upload failed (${res.status}): ${await res.text()}`);
+  return { path: absPath };
 }
