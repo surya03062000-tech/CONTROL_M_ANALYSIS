@@ -12,7 +12,7 @@ const TOOLS: Tool[] = [
   { href: "/control-m", title: "Control-M Analysis", icon: Workflow,
     desc: "Upload a workspace XML, run the lineage job, explore the dependency diagram, and download the Excel dashboard." },
   { href: "https://uno-game-jsys.onrender.com/", title: "Fun Zone — UNO", icon: Gamepad2, external: true,
-    desc: "Take a break and play a multiplayer game of UNO with the team. Opens in a new tab." },
+    desc: "Heads-down for 5+ hours and feeling the grind? Grab the team for a quick 10-minute UNO break to recharge. Opens in a new tab." },
   { href: "#", title: "Drift Analysis", icon: GitCompareArrows, soon: true,
     desc: "Compare lineage and container definitions across runs to surface what changed over time." },
   { href: "#", title: "STM Generator", icon: FileSpreadsheet, soon: true,
@@ -30,6 +30,7 @@ export default function Dashboard() {
     <div className="page">
       <div className="page-head">
         <h1>Data Engineering Portal</h1>
+        <p className="tagline">Powering D&amp;AI Teams, One Tool at a Time</p>
         <p className="sub">Self-service tools for the Rogers Data Engineering team. Pick a tool to get started.</p>
       </div>
 

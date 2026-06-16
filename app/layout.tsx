@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import AppShell from "./components/AppShell";
@@ -7,9 +7,14 @@ const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-int
 
 export const metadata: Metadata = {
   title: "Rogers Data Engineering Portal",
-  description:
-    "Self-service Data Engineering portal — Control-M lineage analysis, diagrams, and Excel dashboards.",
-  icons: { icon: "/icon.svg" },
+  description: "Powering D&AI Teams, One Tool at a Time — Control-M lineage analysis, diagrams, and Excel dashboards.",
+  applicationName: "D&AI Portal",
+  icons: { icon: "/icon.svg", apple: "/icon-192.png" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "D&AI Portal" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#DA291C",
 };
 
 // Set the theme before paint so there's no light→dark flash.
