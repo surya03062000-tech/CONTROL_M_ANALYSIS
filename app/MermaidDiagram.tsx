@@ -4,23 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
   ZoomIn, ZoomOut, Maximize2, Minimize2, Scan, Image as ImageIcon,
-  FileCode2, Search, ExternalLink,
+  FileCode2, Search, ExternalLink, Loader2,
 } from "lucide-react";
 
-// Load mermaid once, client-side only. htmlLabels:false keeps labels as SVG text
+// Load mermaid module once (client-side only). Theme is applied per render so it
+// can follow the app's light/dark mode. htmlLabels:false keeps labels as SVG text
 // so PNG export via canvas doesn't taint / drop labels.
 let mermaidPromise: Promise<any> | null = null;
 async function getMermaid() {
-  if (!mermaidPromise) {
-    mermaidPromise = import("mermaid").then((m) => {
-      const mermaid = m.default;
-      mermaid.initialize({
-        startOnLoad: false, securityLevel: "loose", theme: "neutral",
-        flowchart: { useMaxWidth: false, htmlLabels: false, curve: "basis" },
-      });
-      return mermaid;
-    });
-  }
+  if (!mermaidPromise) mermaidPromise = import("mermaid").then((m) => m.default);
   return mermaidPromise;
 }
 
@@ -33,25 +25,49 @@ function rogersTheme(code: string): string {
 
 export default function MermaidDiagram({ code, liveUrl }: { code: string; liveUrl?: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const twRef = useRef<any>(null);
   const [err, setErr] = useState("");
   const [full, setFull] = useState(false);
   const [query, setQuery] = useState("");
   const [ready, setReady] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
-  // render the diagram
+  // follow the app theme
+  useEffect(() => {
+    const read = () => setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+    read();
+    const obs = new MutationObserver(read);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => obs.disconnect();
+  }, []);
+
+  // render the diagram (re-runs on code or theme change)
   useEffect(() => {
     let cancelled = false;
     setErr(""); setReady(false);
     (async () => {
       try {
         const mermaid = await getMermaid();
+        mermaid.initialize({
+          startOnLoad: false, securityLevel: "loose",
+          theme: theme === "dark" ? "dark" : "neutral",
+          flowchart: { useMaxWidth: false, htmlLabels: false, curve: "basis" },
+        });
         const id = "mmd-" + Math.random().toString(36).slice(2);
         const { svg } = await mermaid.render(id, rogersTheme(code));
-        if (!cancelled && hostRef.current) { hostRef.current.innerHTML = svg; setReady(true); }
+        if (cancelled || !hostRef.current) return;
+        hostRef.current.innerHTML = svg;
+        setReady(true);
+        // fit the whole diagram into view once it's in the DOM
+        setTimeout(() => {
+          const el = hostRef.current?.querySelector("svg") as SVGSVGElement | null;
+          try { if (el && twRef.current?.zoomToElement) twRef.current.zoomToElement(el, undefined, 250); }
+          catch { try { twRef.current?.resetTransform(); } catch {} }
+        }, 60);
       } catch (e: any) { if (!cancelled) setErr(e?.message || String(e)); }
     })();
     return () => { cancelled = true; };
-  }, [code]);
+  }, [code, theme]);
 
   // highlight nodes matching the search query
   useEffect(() => {
@@ -72,9 +88,7 @@ export default function MermaidDiagram({ code, liveUrl }: { code: string; liveUr
     return () => window.removeEventListener("keydown", onKey);
   }, [full]);
 
-  function svgEl(): SVGSVGElement | null {
-    return hostRef.current?.querySelector("svg") || null;
-  }
+  function svgEl(): SVGSVGElement | null { return hostRef.current?.querySelector("svg") || null; }
 
   function downloadSvg() {
     const svg = svgEl(); if (!svg) return;
@@ -97,7 +111,8 @@ export default function MermaidDiagram({ code, liveUrl }: { code: string; liveUr
       canvas.width = w * scale; canvas.height = h * scale;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = theme === "dark" ? "#0f141d" : "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       canvas.toBlob((b) => { if (b) triggerDownload(URL.createObjectURL(b), "control-m-lineage.png"); });
     };
@@ -125,29 +140,34 @@ export default function MermaidDiagram({ code, liveUrl }: { code: string; liveUr
         </div>
       </div>
 
-      <TransformWrapper initialScale={1} minScale={0.2} maxScale={8} centerOnInit
-        wheel={{ step: 0.12 }} doubleClick={{ disabled: true }}>
-        {({ zoomIn, zoomOut, resetTransform }) => (
-          <>
-            <div className="zoom-bar">
-              <button className="icon-btn" onClick={() => zoomIn()} aria-label="Zoom in" title="Zoom in"><ZoomIn size={16} /></button>
-              <button className="icon-btn" onClick={() => zoomOut()} aria-label="Zoom out" title="Zoom out"><ZoomOut size={16} /></button>
-              <button className="icon-btn" onClick={() => resetTransform()} aria-label="Fit" title="Fit"><Scan size={16} /></button>
-              <span className="zoom-sep" />
-              <button className="icon-btn" onClick={downloadPng} aria-label="Download PNG" title="Download PNG"><ImageIcon size={16} /></button>
-              <button className="icon-btn" onClick={downloadSvg} aria-label="Download SVG" title="Download SVG"><FileCode2 size={16} /></button>
-              {liveUrl && <a className="icon-btn" href={liveUrl} target="_blank" rel="noreferrer" aria-label="Mermaid Live" title="Open in Mermaid Live"><ExternalLink size={16} /></a>}
-              <button className="icon-btn" onClick={() => { setFull((v) => !v); setTimeout(() => resetTransform(), 60); }}
-                      aria-label="Fullscreen" title="Fullscreen">
-                {full ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-              </button>
-            </div>
-            <TransformComponent wrapperClass="mm-wrapper" contentClass="mm-content">
-              <div className="mermaid-host" ref={hostRef} aria-label="Dependency diagram" />
-            </TransformComponent>
-          </>
+      <div className="diagram-stage">
+        <TransformWrapper ref={twRef} initialScale={1} minScale={0.1} maxScale={8} centerOnInit
+          wheel={{ step: 0.12 }} doubleClick={{ disabled: true }}>
+          {({ zoomIn, zoomOut, resetTransform }) => (
+            <>
+              <div className="zoom-bar">
+                <button className="icon-btn" onClick={() => zoomIn()} aria-label="Zoom in" title="Zoom in"><ZoomIn size={16} /></button>
+                <button className="icon-btn" onClick={() => zoomOut()} aria-label="Zoom out" title="Zoom out"><ZoomOut size={16} /></button>
+                <button className="icon-btn" onClick={() => { const el = svgEl(); el && twRef.current?.zoomToElement ? twRef.current.zoomToElement(el, undefined, 250) : resetTransform(); }} aria-label="Fit" title="Fit to screen"><Scan size={16} /></button>
+                <span className="zoom-sep" />
+                <button className="icon-btn" onClick={downloadPng} aria-label="Download PNG" title="Download PNG"><ImageIcon size={16} /></button>
+                <button className="icon-btn" onClick={downloadSvg} aria-label="Download SVG" title="Download SVG"><FileCode2 size={16} /></button>
+                {liveUrl && <a className="icon-btn" href={liveUrl} target="_blank" rel="noreferrer" aria-label="Mermaid Live" title="Open in Mermaid Live"><ExternalLink size={16} /></a>}
+                <button className="icon-btn" onClick={() => { setFull((v) => !v); setTimeout(() => { const el = svgEl(); el && twRef.current?.zoomToElement ? twRef.current.zoomToElement(el, undefined, 200) : resetTransform(); }, 80); }}
+                        aria-label="Fullscreen" title="Fullscreen">
+                  {full ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                </button>
+              </div>
+              <TransformComponent wrapperClass="mm-wrapper" contentClass="mm-content">
+                <div className="mermaid-host" ref={hostRef} aria-label="Dependency diagram" />
+              </TransformComponent>
+            </>
+          )}
+        </TransformWrapper>
+        {!ready && (
+          <div className="diagram-loading"><Loader2 size={18} className="spin" /> Rendering diagram…</div>
         )}
-      </TransformWrapper>
+      </div>
 
       <details className="source">
         <summary>Show Mermaid source</summary>
