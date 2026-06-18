@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  Workflow, GitCompareArrows, FileSpreadsheet, FileText,
+  Workflow, Database, GitCompareArrows, FileSpreadsheet, FileText,
   CalendarDays, KeyRound, Gamepad2, ArrowRight, ExternalLink,
 } from "lucide-react";
 
@@ -11,6 +11,8 @@ interface Tool {
 const TOOLS: Tool[] = [
   { href: "/control-m", title: "Control-M Analysis", icon: Workflow,
     desc: "Upload a workspace XML, run the lineage job, explore the dependency diagram, and download the Excel dashboard." },
+  { href: "/history-load", title: "History Load (Prod)", icon: Database,
+    desc: "Open the production history-load notebooks in Rogers Databricks. Dev access required." },
   { href: "https://uno-game-jsys.onrender.com/", title: "Fun Zone — UNO", icon: Gamepad2, external: true,
     desc: "Heads-down for 5+ hours and feeling the grind? Grab the team for a quick 10-minute UNO break to recharge. Opens in a new tab." },
   { href: "#", title: "Drift Analysis", icon: GitCompareArrows, soon: true,

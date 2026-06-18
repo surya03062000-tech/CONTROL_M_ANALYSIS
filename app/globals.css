@@ -121,6 +121,9 @@ body {
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .tagline { color: var(--accent); font-size: 14px; font-weight: 700; font-style: italic; margin: 0 0 8px; }
+.callout { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: var(--radius-sm); margin-bottom: 22px; font-size: 13.5px; line-height: 1.55; }
+.callout.warn { background: color-mix(in srgb, var(--warn) 13%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warn) 38%, transparent); color: var(--text); }
+.callout svg { color: var(--warn); flex: 0 0 auto; margin-top: 1px; }
 .sub { color: var(--text-2); font-size: 14px; margin: 0; max-width: 680px; line-height: 1.55; }
 
 /* ── Tool launcher (dashboard) ──────────────────────────────────────────── */
