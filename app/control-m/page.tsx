@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
-  Upload, Play, Download, X, Clock, History, RotateCcw, RefreshCw,
-  CircleHelp, ExternalLink, FileSpreadsheet, Loader2, Ban,
+  Upload, Play, Download, Clock, History, RotateCcw, RefreshCw,
+  CircleHelp, ExternalLink, FileSpreadsheet, Loader2, Ban, Lock,
+  Workflow, Boxes, CircleDot, Share2,
 } from "lucide-react";
 import { useToast } from "../components/Toast";
 
@@ -261,7 +262,7 @@ export default function ControlMPage() {
         ) : null}
 
         <div className="row" style={{ marginTop: 14 }}>
-          <button className="btn" onClick={upload} disabled={!file || uploading}>
+          <button className="btn secondary" onClick={upload} disabled={!file || uploading}>
             {uploading ? <><Loader2 size={16} className="spin" /> Uploading… {uploadPct}%</> : <><Upload size={16} /> Upload to Volume</>}
           </button>
         </div>
@@ -343,8 +344,13 @@ export default function ControlMPage() {
           )}
 
           <div className="full">
-            <label>App password (only if the deployment is gated)</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="leave blank if not set" />
+            <div className="gate">
+              <span className="gate-ico"><Lock size={18} /></span>
+              <div className="gate-field">
+                <label>App password <span className="muted">(only if the deployment is gated)</span></label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="leave blank if not set" />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -409,10 +415,10 @@ export default function ControlMPage() {
 
           {flow && (
             <div className="stats">
-              <Stat label="Jobs" value={flow.jobs} />
-              <Stat label="Containers" value={flow.containers} />
-              <Stat label="Diagram nodes" value={flow.nodes} />
-              <Stat label="Edges" value={flow.edges} />
+              <Stat label="Jobs" value={flow.jobs} icon={Workflow} color="#DA291C" />
+              <Stat label="Containers" value={flow.containers} icon={Boxes} color="#2563eb" />
+              <Stat label="Diagram nodes" value={flow.nodes} icon={CircleDot} color="#7c3aed" />
+              <Stat label="Edges" value={flow.edges} icon={Share2} color="#0891b2" />
             </div>
           )}
 
@@ -457,8 +463,16 @@ export default function ControlMPage() {
             <RefreshCw size={16} className={histLoading ? "spin" : ""} />
           </button>
         </div>
-        {outputs.length === 0 ? (
-          <div className="muted small">{histLoading ? "Loading…" : "No outputs found yet (or enter the app password and refresh)."}</div>
+        {histLoading && outputs.length === 0 ? (
+          <div className="hist">
+            {[0, 1, 2].map((i) => <div key={i} className="skeleton skel-row" />)}
+          </div>
+        ) : outputs.length === 0 ? (
+          <div className="empty">
+            <div className="empty-ico"><FileSpreadsheet size={22} /></div>
+            <div className="empty-title">No outputs yet</div>
+            <div className="empty-sub">Run an analysis to generate an Excel dashboard, or enter the app password and refresh.</div>
+          </div>
         ) : (
           <div className="hist">
             {outputs.map((o) => (
@@ -480,8 +494,14 @@ export default function ControlMPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value?: number }) {
-  return <div className="stat"><div className="stat-val">{value ?? "—"}</div><div className="stat-lbl">{label}</div></div>;
+function Stat({ label, value, icon: Icon, color }: { label: string; value?: number; icon: any; color: string }) {
+  return (
+    <div className="stat">
+      <div className="stat-ico" style={{ background: color }}><Icon size={18} /></div>
+      <div className="stat-val">{value ?? "—"}</div>
+      <div className="stat-lbl">{label}</div>
+    </div>
+  );
 }
 function MetaRow({ k, v }: { k: string; v?: string }) {
   return <div className="meta-row"><span className="meta-k">{k}</span><span className="meta-v">{v || "—"}</span></div>;

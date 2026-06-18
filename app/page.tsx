@@ -1,62 +1,73 @@
 import Link from "next/link";
 import {
   Workflow, Database, GitCompareArrows, FileSpreadsheet, FileText,
-  CalendarDays, KeyRound, Gamepad2, ArrowRight, ExternalLink,
+  CalendarDays, KeyRound, Gamepad2, ArrowRight, ExternalLink, Clock,
 } from "lucide-react";
+import Hero from "./components/Hero";
 
 interface Tool {
-  href: string; title: string; desc: string; icon: any; soon?: boolean; external?: boolean;
+  href: string; title: string; desc: string; icon: any; color: string; soon?: boolean; external?: boolean;
 }
 
-const TOOLS: Tool[] = [
-  { href: "/control-m", title: "Control-M Analysis", icon: Workflow,
+const WORK: Tool[] = [
+  { href: "/control-m", title: "Control-M Analysis", icon: Workflow, color: "#DA291C",
     desc: "Upload a workspace XML, run the lineage job, explore the dependency diagram, and download the Excel dashboard." },
-  { href: "/history-load", title: "History Load (Prod)", icon: Database,
+  { href: "/history-load", title: "History Load (Prod)", icon: Database, color: "#2563eb",
     desc: "Open the production history-load notebooks in Rogers Databricks. Dev access required." },
-  { href: "https://uno-game-jsys.onrender.com/", title: "Fun Zone — UNO", icon: Gamepad2, external: true,
+];
+
+const FUN: Tool[] = [
+  { href: "https://uno-game-jsys.onrender.com/", title: "Fun Zone — UNO", icon: Gamepad2, color: "#7c3aed", external: true,
     desc: "Heads-down for 5+ hours and feeling the grind? Grab the team for a quick 10-minute UNO break to recharge. Opens in a new tab." },
-  { href: "#", title: "Drift Analysis", icon: GitCompareArrows, soon: true,
+];
+
+const SOON: Tool[] = [
+  { href: "#", title: "Drift Analysis", icon: GitCompareArrows, color: "#0891b2", soon: true,
     desc: "Compare lineage and container definitions across runs to surface what changed over time." },
-  { href: "#", title: "STM Generator", icon: FileSpreadsheet, soon: true,
+  { href: "#", title: "STM Generator", icon: FileSpreadsheet, color: "#0891b2", soon: true,
     desc: "Generate Source-to-Target Mappings for ingestion and derived tables." },
-  { href: "#", title: "DG / HLD Docs", icon: FileText, soon: true,
+  { href: "#", title: "DG / HLD Docs", icon: FileText, color: "#0891b2", soon: true,
     desc: "Auto-create Data Governance and High-Level Design documents." },
-  { href: "#", title: "Leave Tracker", icon: CalendarDays, soon: true,
+  { href: "#", title: "Leave Tracker", icon: CalendarDays, color: "#0891b2", soon: true,
     desc: "Track team leave and availability at a glance." },
-  { href: "#", title: "Access Requests", icon: KeyRound, soon: true,
+  { href: "#", title: "Access Requests", icon: KeyRound, color: "#0891b2", soon: true,
     desc: "Shortcuts and import links for common Rogers access requests." },
 ];
+
+function Card({ t }: { t: Tool }) {
+  const Icon = t.icon;
+  const inner = (
+    <>
+      <div className="tool-ico"><Icon size={22} /></div>
+      <div className="tool-body">
+        <div className="tool-title">
+          {t.title}
+          {t.soon && <><span className="soon">soon</span><Clock size={14} className="soon-ico" /></>}
+        </div>
+        <p className="tool-desc">{t.desc}</p>
+      </div>
+      {!t.soon && (t.external ? <ExternalLink size={18} className="tool-arrow" /> : <ArrowRight size={18} className="tool-arrow" />)}
+    </>
+  );
+  const style = { ["--tool" as any]: t.color };
+  if (t.soon) return <div className="tool-card disabled" style={style}>{inner}</div>;
+  if (t.external) return <a className="tool-card" style={style} href={t.href} target="_blank" rel="noreferrer">{inner}</a>;
+  return <Link className="tool-card" style={style} href={t.href}>{inner}</Link>;
+}
 
 export default function Dashboard() {
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>Data Engineering Portal</h1>
-        <p className="tagline">Powering D&amp;AI Teams, One Tool at a Time</p>
-        <p className="sub">Self-service tools for the Rogers Data Engineering team. Pick a tool to get started.</p>
-      </div>
+      <Hero />
 
-      <div className="tool-grid">
-        {TOOLS.map((t) => {
-          const Icon = t.icon;
-          const card = (
-            <>
-              <div className="tool-ico"><Icon size={22} /></div>
-              <div className="tool-body">
-                <div className="tool-title">
-                  {t.title}
-                  {t.soon && <span className="soon">soon</span>}
-                </div>
-                <p className="tool-desc">{t.desc}</p>
-              </div>
-              {!t.soon && (t.external ? <ExternalLink size={18} className="tool-arrow" /> : <ArrowRight size={18} className="tool-arrow" />)}
-            </>
-          );
-          if (t.soon) return <div key={t.title} className="tool-card disabled">{card}</div>;
-          if (t.external) return <a key={t.title} href={t.href} target="_blank" rel="noreferrer" className="tool-card">{card}</a>;
-          return <Link key={t.title} href={t.href} className="tool-card">{card}</Link>;
-        })}
-      </div>
+      <div className="section-title">Workspace tools</div>
+      <div className="tool-grid">{WORK.map((t) => <Card key={t.title} t={t} />)}</div>
+
+      <div className="section-title">Fun</div>
+      <div className="tool-grid">{FUN.map((t) => <Card key={t.title} t={t} />)}</div>
+
+      <div className="section-title">Coming soon</div>
+      <div className="tool-grid">{SOON.map((t) => <Card key={t.title} t={t} />)}</div>
     </div>
   );
 }
