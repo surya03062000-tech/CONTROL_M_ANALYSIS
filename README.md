@@ -158,7 +158,8 @@ full or half-day (AM/PM), reason → submit. The Request ID is auto-generated bu
 A month **calendar** shows your leave + how many teammates are off (overlap warning); you
 can **edit/withdraw** records, **change password**, **export .ics**, and use **forgot-password**
 (email link). **Admin** (admin-only login): monthly **dashboard** (calendar with names, filters,
-per-type charts), **CSV export** + **email summary**, manage **users** (employees *and* admins:
+per-type charts), **Excel report** (monthly / yearly / custom period, with a per-employee
+summary sheet) + **email summary**, manage **users** (employees *and* admins:
 add/edit/deactivate/role/reset, per-employee history), **company holidays**, notification
 recipients, and an **audit log**. Login is rate-limited; new/reset users must set a password on
 next sign-in; tables auto-create and the `admin` account is seeded on first login.

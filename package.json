@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "bcryptjs": "2.4.3",
+    "exceljs": "4.4.0",
     "jose": "5.9.6",
     "lucide-react": "0.460.0",
     "mermaid": "11.4.1",

@@ -142,6 +142,12 @@ export async function listLeavesByMonth(month: string): Promise<LeaveReq[]> {
   const start = `${month}-01`, end = `${month}-31`;
   return (await runSql(`SELECT * FROM ${T("requests")} WHERE start_date <= :end AND end_date >= :start ORDER BY start_date`, { start, end })) as any;
 }
+export async function listLeavesByRange(from: string, to: string): Promise<LeaveReq[]> {
+  return (await runSql(
+    `SELECT * FROM ${T("requests")} WHERE start_date <= :to AND end_date >= :from ORDER BY display_name, start_date`,
+    { from, to }
+  )) as any;
+}
 export async function ownLeavesOverlapping(username: string, start: string, end: string, excludeId = ""): Promise<LeaveReq[]> {
   return (await runSql(
     `SELECT * FROM ${T("requests")} WHERE username = :u AND start_date <= :end AND end_date >= :start AND request_id <> :ex`,
