@@ -6,9 +6,11 @@ import { hashPassword } from "./leaveAuth";
 const clean = (v: string | undefined) =>
   (v || "").trim().replace(/^["']|["']$/g, "").replace(/^Bearer\s+/i, "").trim();
 
-const HOST = clean(process.env.DATABRICKS_HOST).replace(/\/+$/, "");
+const HOST = clean(process.env.DATABRICKS_HOST).replace(/\/+$/, "") || "https://dbc-927300a1-adc8.cloud.databricks.com";
 const TOKEN = clean(process.env.DATABRICKS_TOKEN);
-const WAREHOUSE = clean(process.env.DATABRICKS_WAREHOUSE_ID);
+// SQL Warehouse used to store leave data. Warehouse ID is a non-secret identifier,
+// so we default to the team's warehouse; override via env if needed.
+const WAREHOUSE = clean(process.env.DATABRICKS_WAREHOUSE_ID) || "638494b8211390ee";
 const CATALOG = clean(process.env.LEAVE_CATALOG) || "edl_qa";
 const SCHEMA = clean(process.env.LEAVE_SCHEMA) || "qa_agent";
 
