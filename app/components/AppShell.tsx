@@ -17,11 +17,11 @@ const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/control-m", label: "Control-M Analysis", icon: Workflow },
   { href: "/history-load", label: "History Load (Prod)", icon: Database },
+  { href: "/leave", label: "Leave Tracker", icon: CalendarDays },
   { href: "https://uno-game-jsys.onrender.com/", label: "Fun Zone — UNO", icon: Gamepad2, external: true },
   { href: "#", label: "Drift Analysis", icon: GitCompareArrows, soon: true },
   { href: "#", label: "STM Generator", icon: FileSpreadsheet, soon: true },
   { href: "#", label: "DG / HLD Docs", icon: FileText, soon: true },
-  { href: "#", label: "Leave Tracker", icon: CalendarDays, soon: true },
   { href: "#", label: "Access Requests", icon: KeyRound, soon: true },
 ];
 

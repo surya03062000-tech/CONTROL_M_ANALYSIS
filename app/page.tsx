@@ -14,6 +14,8 @@ const WORK: Tool[] = [
     desc: "Upload a workspace XML, run the lineage job, explore the dependency diagram, and download the Excel dashboard." },
   { href: "/history-load", title: "History Load (Prod)", icon: Database, color: "#2563eb",
     desc: "Open the production history-load notebooks in Rogers Databricks. Dev access required." },
+  { href: "/leave", title: "Leave Tracker", icon: CalendarDays, color: "#16a34a",
+    desc: "Sign in to record your leave on a calendar; admins manage employees, view a monthly dashboard, and configure email alerts." },
 ];
 
 const FUN: Tool[] = [
@@ -28,8 +30,6 @@ const SOON: Tool[] = [
     desc: "Generate Source-to-Target Mappings for ingestion and derived tables." },
   { href: "#", title: "DG / HLD Docs", icon: FileText, color: "#0891b2", soon: true,
     desc: "Auto-create Data Governance and High-Level Design documents." },
-  { href: "#", title: "Leave Tracker", icon: CalendarDays, color: "#0891b2", soon: true,
-    desc: "Track team leave and availability at a glance." },
   { href: "#", title: "Access Requests", icon: KeyRound, color: "#0891b2", soon: true,
     desc: "Shortcuts and import links for common Rogers access requests." },
 ];
