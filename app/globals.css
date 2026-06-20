@@ -448,6 +448,62 @@ input.err { border-color: var(--err); }
 .tpill.t-planned { background: var(--ok-bg); color: var(--ok); }
 html[data-theme="dark"] .tpill.t-sick { background: #0c2a33; color: #67e8f9; }
 
+/* link-styled button */
+.linkbtn { appearance: none; border: 0; background: transparent; color: var(--accent); font-weight: 600; font-size: inherit; cursor: pointer; padding: 0; font-family: inherit; text-align: left; }
+.linkbtn:hover { text-decoration: underline; }
+
+/* charts (per-type bars) */
+.bars { margin-top: 18px; display: flex; flex-direction: column; gap: 9px; }
+.bar-row { display: grid; grid-template-columns: 90px 1fr 34px; align-items: center; gap: 10px; font-size: 12.5px; }
+.bar-label { color: var(--text-2); font-weight: 600; }
+.bar-track { height: 12px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.bar-fill { display: block; height: 100%; border-radius: 999px; transition: width .4s ease; }
+.bar-n { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-2); }
+
+/* stats variant for admin dashboard */
+.stats.five { grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 760px) { .stats.five { grid-template-columns: repeat(2, 1fr); } }
+
+/* calendar */
+.cal { margin-top: 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; }
+.cal-head { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 12px; background: var(--surface-2); border-bottom: 1px solid var(--line); font-size: 14px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.cal-wd { background: var(--surface-2); }
+.cal-wdh { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); padding: 7px 2px; text-transform: uppercase; letter-spacing: .4px; }
+.cal-cell { min-height: 74px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 5px 6px; display: flex; flex-direction: column; gap: 3px; position: relative; }
+.cal-cell:nth-child(7n) { border-right: 0; }
+.cal-cell.empty { background: var(--surface-2); }
+.cal-cell.weekend { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+.cal-cell.pick { cursor: pointer; }
+.cal-cell.pick:hover { background: var(--accent-soft); }
+.cal-cell.mine { box-shadow: inset 0 0 0 2px var(--accent); }
+.cal-cell.holiday { background: color-mix(in srgb, var(--warn) 14%, var(--surface)); }
+.cal-day { font-size: 12px; font-weight: 700; color: var(--text-2); }
+.cal-cell.today .cal-day { background: var(--accent); color: #fff; border-radius: 999px; width: 20px; height: 20px; display: grid; place-items: center; }
+.cal-count { font-size: 10.5px; font-weight: 700; color: var(--run); background: var(--run-bg); border-radius: 6px; padding: 1px 5px; align-self: flex-start; }
+.cal-hol { font-size: 9.5px; font-weight: 700; color: var(--warn); line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-name { font-size: 9.5px; font-weight: 600; padding: 1px 5px; border-radius: 5px; border-left: 3px solid; background: var(--surface-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-more { font-size: 9.5px; color: var(--muted); }
+@media (max-width: 620px) {
+  .cal-cell { min-height: 56px; padding: 3px; }
+  .cal-name, .cal-hol { display: none; }
+  .cal-count { font-size: 9.5px; padding: 0 4px; }
+}
+
+/* modal */
+.modal-scrim { position: fixed; inset: 0; z-index: 70; background: rgba(8,12,22,.5); display: flex; align-items: center; justify-content: center; padding: 18px; animation: toastIn .15s ease; }
+.modal { width: 100%; max-width: 460px; max-height: 88vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-hover); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.modal-body { padding: 18px; }
+.modal-body label { margin-top: 0; }
+
+/* responsive */
+@media (max-width: 700px) {
+  .tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tab { white-space: nowrap; }
+  .leave-top .row { width: 100%; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }
