@@ -154,10 +154,14 @@ via the SQL Statement Execution API.
    admin-configured recipients.
 
 **Employee:** sign in → pick leave type (Holiday / Unplanned / Sick / Planned), date(s),
-full/half day, reason → submit (a Request ID is generated, recipients are emailed).
-Can change their own password. **Admin** (admin-only login): monthly dashboard of who's on
-leave, add/remove employees, reset passwords, and configure the notification recipients.
-Tables auto-create on first login; the `admin` account is seeded automatically.
+full or half-day (AM/PM), reason → submit. The Request ID is auto-generated but editable.
+A month **calendar** shows your leave + how many teammates are off (overlap warning); you
+can **edit/withdraw** records, **change password**, **export .ics**, and use **forgot-password**
+(email link). **Admin** (admin-only login): monthly **dashboard** (calendar with names, filters,
+per-type charts), **CSV export** + **email summary**, manage **users** (employees *and* admins:
+add/edit/deactivate/role/reset, per-employee history), **company holidays**, notification
+recipients, and an **audit log**. Login is rate-limited; new/reset users must set a password on
+next sign-in; tables auto-create and the `admin` account is seeded on first login.
 
 ## Notes / troubleshooting
 - **401 from Databricks** → token expired or lacks job/Files permission.
