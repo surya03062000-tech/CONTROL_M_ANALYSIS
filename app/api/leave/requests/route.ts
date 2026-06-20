@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/leaveAuth";
-import { insertLeave, listLeavesByUser, getConfig, ownLeavesOverlapping, leaveIdExists, insertAudit } from "@/lib/leaveDb";
-import { LEAVE_TYPES, computeDays, genRequestId, isHalf } from "@/lib/leaveShared";
+import { insertLeave, listLeavesByUser, getConfig, ownLeavesOverlapping, leaveIdExists, insertAudit, listHolidays } from "@/lib/leaveDb";
+import { LEAVE_TYPES, computeWorkingDays, genRequestId, isHalf } from "@/lib/leaveShared";
 import { sendMail, leaveEmailHtml } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
@@ -45,9 +45,14 @@ export async function POST(req: NextRequest) {
     let request_id = String(body.request_id || "").trim() || genRequestId();
     if (await leaveIdExists(request_id)) return NextResponse.json({ error: `Request ID '${request_id}' already exists. Choose another.` }, { status: 409 });
 
+    // Weekends (Sat/Sun) and company holidays are not counted as leave.
+    const holidays = new Set((await listHolidays()).map((h) => h.holiday_date));
+    const wdays = computeWorkingDays(start_date, end_date, day_part, holidays);
+    if (wdays <= 0) return NextResponse.json({ error: "Those date(s) fall on a weekend/holiday, which aren't counted as leave." }, { status: 400 });
+
     const rec = {
       request_id, username: s.username, display_name: s.name, leave_type, start_date, end_date,
-      day_part, days: String(computeDays(start_date, end_date, day_part)), reason,
+      day_part, days: String(wdays), reason,
       status: "submitted", created_at: new Date().toISOString(),
     };
     await insertLeave(rec);
