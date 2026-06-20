@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/leaveAuth";
-import { getLeaveById, deleteLeave, updateLeave, ownLeavesOverlapping, insertAudit } from "@/lib/leaveDb";
-import { LEAVE_TYPES, computeDays, isHalf } from "@/lib/leaveShared";
+import { getLeaveById, deleteLeave, updateLeave, ownLeavesOverlapping, insertAudit, listHolidays } from "@/lib/leaveDb";
+import { LEAVE_TYPES, computeWorkingDays, isHalf } from "@/lib/leaveShared";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -46,7 +46,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const overlap = await ownLeavesOverlapping(rec.username, start_date, end_date, id);
     if (overlap.length) return NextResponse.json({ error: `Overlaps another leave (${overlap[0].request_id}).` }, { status: 409 });
 
-    await updateLeave(id, { leave_type, start_date, end_date, day_part, days: String(computeDays(start_date, end_date, day_part)), reason });
+    const holidays = new Set((await listHolidays()).map((h) => h.holiday_date));
+    const wdays = computeWorkingDays(start_date, end_date, day_part, holidays);
+    if (wdays <= 0) return NextResponse.json({ error: "Those date(s) fall on a weekend/holiday, which aren't counted as leave." }, { status: 400 });
+
+    await updateLeave(id, { leave_type, start_date, end_date, day_part, days: String(wdays), reason });
     await insertAudit(s.username, "leave_edit", id, "");
     return NextResponse.json({ ok: true });
   } catch (e: any) {

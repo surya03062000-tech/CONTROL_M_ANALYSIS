@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  ShieldCheck, LogOut, Loader2, Lock, UserPlus, Trash2, KeyRound, Pencil, X,
+  ShieldCheck, LogOut, Loader2, Lock, UserPlus, Trash2, KeyRound, Pencil, Upload,
   LayoutDashboard, Users, Mail, Save, CalendarDays, FileSpreadsheet, Send, Plus, ScrollText, AlertTriangle,
 } from "lucide-react";
 import { useToast } from "../../components/Toast";
 import LeaveCalendar, { CalCell } from "../LeaveCalendar";
-import { LEAVE_TYPES, dayPartLabel, rangeLabel, typeColor, expandDates } from "@/lib/leaveShared";
+import { Modal, ConfirmDialog, PromptDialog } from "../Modal";
+import { LEAVE_TYPES, dayPartLabel, rangeLabel, typeColor, workingDates } from "@/lib/leaveShared";
 
 interface Session { username: string; role: string; name: string; }
 interface UserRow { username: string; role: string; display_name: string; email: string; active: string; created_at: string; must_change: string; }
@@ -109,6 +110,7 @@ function AdminView({ session, insecure, onOut, toast }: { session: Session; inse
 function Dashboard({ toast }: { toast: (m: string, k?: any) => void }) {
   const [month, setMonth] = useState(thisMonth());
   const [leaves, setLeaves] = useState<Leave[]>([]);
+  const [holidays, setHolidays] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [fEmp, setFEmp] = useState(""); const [fType, setFType] = useState("all");
   const [busyMail, setBusyMail] = useState(false);
@@ -132,6 +134,7 @@ function Dashboard({ toast }: { toast: (m: string, k?: any) => void }) {
   }
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [month]);
+  useEffect(() => { (async () => { try { const r = await fetch("/api/leave/admin/holidays", { cache: "no-store" }); const d = await r.json(); if (r.ok) { const h: Record<string, string> = {}; (d.holidays || []).forEach((x: any) => { h[x.holiday_date] = x.name; }); setHolidays(h); } } catch {} })(); }, []);
   async function load() {
     setLoading(true);
     try { const r = await fetch(`/api/leave/admin/leaves?month=${month}`, { cache: "no-store" }); const d = await r.json(); if (r.ok) setLeaves(d.leaves || []); } catch {} finally { setLoading(false); }
@@ -149,11 +152,20 @@ function Dashboard({ toast }: { toast: (m: string, k?: any) => void }) {
 
   const cells: Record<string, CalCell> = useMemo(() => {
     const c: Record<string, CalCell> = {};
-    filtered.forEach((l) => expandDates(l.start_date, l.end_date).forEach((d) => {
+    const holSet = new Set(Object.keys(holidays));
+    filtered.forEach((l) => workingDates(l.start_date, l.end_date, holSet).forEach((d) => {
       if (d.startsWith(month)) { c[d] = c[d] || { people: [] }; c[d].people!.push({ name: l.display_name, type: l.leave_type }); }
     }));
+    Object.entries(holidays).forEach(([d, name]) => { if (d.startsWith(month)) c[d] = { ...(c[d] || {}), holiday: name }; });
     return c;
-  }, [filtered, month]);
+  }, [filtered, month, holidays]);
+
+  const ranking = useMemo(() => {
+    const m = new Map<string, { name: string; days: number; reqs: number }>();
+    leaves.forEach((l) => { const e = m.get(l.username) || { name: l.display_name, days: 0, reqs: 0 }; e.days += Number(l.days) || 0; e.reqs += 1; m.set(l.username, e); });
+    return [...m.values()].sort((a, b) => b.days - a.days).slice(0, 8);
+  }, [leaves]);
+  const topDays = Math.max(1, ...ranking.map((r) => r.days));
 
   const monthLong = new Date(month + "-01T00:00:00").toLocaleString(undefined, { month: "long", year: "numeric" });
 
@@ -221,6 +233,22 @@ function Dashboard({ toast }: { toast: (m: string, k?: any) => void }) {
       </section>
 
       <section className="card">
+        <div className="card-head"><span className="step-num"><Users size={15} /></span><h2>Top by leave — {month}</h2></div>
+        {ranking.length === 0 ? <div className="muted small">No leave recorded this month.</div> : (
+          <div className="rank">
+            {ranking.map((r, i) => (
+              <div className="rank-row" key={r.name + i}>
+                <span className="rank-pos">{i + 1}</span>
+                <span className="rank-name">{r.name}</span>
+                <span className="rank-track"><span className="rank-fill" style={{ width: `${(r.days / topDays) * 100}%` }} /></span>
+                <span className="rank-val">{r.days}d · {r.reqs}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="card">
         <div className="card-head"><span className="step-num"><Users size={15} /></span><h2>Leave records</h2>
           <div className="row" style={{ marginLeft: "auto", gap: 8 }}>
             <input placeholder="Filter employee…" value={fEmp} onChange={(e) => setFEmp(e.target.value)} style={{ width: 170 }} />
@@ -265,6 +293,10 @@ function Employees({ session, toast }: { session: Session; toast: (m: string, k?
   const [busy, setBusy] = useState(false);
   const [edit, setEdit] = useState<UserRow | null>(null);
   const [history, setHistory] = useState<{ user: string; leaves: Leave[] } | null>(null);
+  const [delTarget, setDelTarget] = useState<string | null>(null);
+  const [resetTarget, setResetTarget] = useState<string | null>(null);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [bulkText, setBulkText] = useState(""); const [bulkBusy, setBulkBusy] = useState(false); const [bulkRes, setBulkRes] = useState<any[] | null>(null);
 
   useEffect(() => { load(); }, []);
   async function load() {
@@ -280,20 +312,32 @@ function Employees({ session, toast }: { session: Session; toast: (m: string, k?
     } catch (e: any) { toast(e?.message || String(e), "error"); } finally { setBusy(false); }
   }
   async function act(username: string, body: any, ok: string) {
-    try { const r = await fetch(`/api/leave/admin/users/${encodeURIComponent(username)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const d = await r.json(); if (!r.ok) throw new Error(d.error || "Failed"); toast(ok, "success"); load(); }
-    catch (e: any) { toast(e?.message || String(e), "error"); }
+    const r = await fetch(`/api/leave/admin/users/${encodeURIComponent(username)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const d = await r.json(); if (!r.ok) throw new Error(d.error || "Failed"); toast(ok, "success"); load();
   }
   async function remove(username: string) {
-    if (!confirm(`Remove '${username}'? This deletes the account.`)) return;
-    try { const r = await fetch(`/api/leave/admin/users/${encodeURIComponent(username)}`, { method: "DELETE" }); const d = await r.json(); if (!r.ok) throw new Error(d.error || "Failed"); toast(`Removed '${username}'`, "info"); load(); }
-    catch (e: any) { toast(e?.message || String(e), "error"); }
-  }
-  async function resetPw(username: string) {
-    const np = prompt(`New password for '${username}' (they'll be asked to change it):`); if (!np) return;
-    act(username, { action: "reset", password: np }, `Password reset for '${username}'`);
+    const r = await fetch(`/api/leave/admin/users/${encodeURIComponent(username)}`, { method: "DELETE" });
+    const d = await r.json(); if (!r.ok) throw new Error(d.error || "Failed"); toast(`Removed '${username}'`, "info"); load();
   }
   async function openHistory(username: string) {
     try { const r = await fetch(`/api/leave/admin/leaves?username=${encodeURIComponent(username)}`, { cache: "no-store" }); const d = await r.json(); if (r.ok) setHistory({ user: username, leaves: d.leaves || [] }); } catch {}
+  }
+  function toggleSel(username: string) { setSel((s) => { const n = new Set(s); n.has(username) ? n.delete(username) : n.add(username); return n; }); }
+  function toggleAll() { setSel((s) => s.size === list.length ? new Set() : new Set(list.map((x) => x.username))); }
+  async function bulkActive(active: boolean) {
+    const targets = [...sel];
+    for (const un of targets) { try { await fetch(`/api/leave/admin/users/${encodeURIComponent(un)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "active", active }) }); } catch {} }
+    toast(`${targets.length} user(s) ${active ? "activated" : "deactivated"}`, "info"); setSel(new Set()); load();
+  }
+  async function bulkImport() {
+    const rows = bulkText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((line) => {
+      const [username, display_name, em, password, r] = line.split(",").map((x) => (x || "").trim());
+      return { username, display_name, email: em, password, role: r };
+    }).filter((r) => r.username && r.username.toLowerCase() !== "username");
+    if (!rows.length) { toast("Paste at least one user row", "error"); return; }
+    setBulkBusy(true); setBulkRes(null);
+    try { const r = await fetch("/api/leave/admin/users/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows }) }); const d = await r.json(); if (!r.ok) throw new Error(d.error || "Failed"); setBulkRes(d.results || []); toast(`Imported ${d.added}/${d.total}`, d.added ? "success" : "error"); load(); }
+    catch (e: any) { toast(e?.message || String(e), "error"); } finally { setBulkBusy(false); }
   }
 
   return (
@@ -314,25 +358,53 @@ function Employees({ session, toast }: { session: Session; toast: (m: string, k?
       </section>
 
       <section className="card">
+        <div className="card-head"><span className="step-num"><Upload size={15} /></span><h2>Bulk import users</h2></div>
+        <p className="muted small">One per line: <code>username,display_name,email,password,role</code> — role optional (default employee), a header row is ignored.</p>
+        <textarea className="ta mono" rows={5} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder={"jdoe,Jane Doe,jane@rogers.com,Pass1234,employee\nmsmith,Mike Smith,mike@rogers.com,Pass1234"} />
+        <div className="row" style={{ marginTop: 12 }}>
+          <button className="btn primary sm" onClick={bulkImport} disabled={bulkBusy || !bulkText.trim()}>{bulkBusy ? <Loader2 size={14} className="spin" /> : <Upload size={15} />} Import users</button>
+        </div>
+        {bulkRes && (
+          <div className="ltable-wrap" style={{ marginTop: 12 }}>
+            <table className="ltable"><thead><tr><th>Username</th><th>Result</th></tr></thead>
+              <tbody>{bulkRes.map((r, i) => (<tr key={i}><td className="mono">{r.username}</td><td>{r.ok ? <span className="tpill t-planned">added</span> : <span className="tpill t-holiday">{r.error}</span>}</td></tr>))}</tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="card">
         <div className="card-head"><span className="step-num"><Users size={15} /></span><h2>Users</h2></div>
+        {sel.size > 0 && (
+          <div className="bulk-bar">
+            <span>{sel.size} selected</span>
+            <button className="btn ghost sm" onClick={() => bulkActive(true)}>Activate</button>
+            <button className="btn ghost sm" onClick={() => bulkActive(false)}>Deactivate</button>
+            <button className="linkbtn" onClick={() => setSel(new Set())}>Clear</button>
+          </div>
+        )}
         {loading ? (
           <div className="ltable-wrap">{[0, 1, 2].map((i) => <div key={i} className="skeleton skel-row" />)}</div>
         ) : (
           <div className="ltable-wrap">
             <table className="ltable">
-              <thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead>
+              <thead><tr>
+                <th style={{ width: 28 }}><input type="checkbox" style={{ width: "auto" }} checked={sel.size === list.length && list.length > 0} onChange={toggleAll} /></th>
+                <th>Username</th><th>Name</th><th>Role</th><th>Status</th><th></th>
+              </tr></thead>
               <tbody>
                 {list.map((e) => (
                   <tr key={e.username} style={e.active === "false" ? { opacity: .55 } : undefined}>
+                    <td><input type="checkbox" style={{ width: "auto" }} checked={sel.has(e.username)} onChange={() => toggleSel(e.username)} /></td>
                     <td className="mono">{e.username}</td>
                     <td><button className="linkbtn" onClick={() => openHistory(e.username)}>{e.display_name}</button></td>
                     <td><span className={`tpill ${e.role === "admin" ? "t-holiday" : "t-planned"}`}>{e.role}</span></td>
                     <td>{e.active === "false" ? <span className="muted">inactive</span> : "active"}</td>
                     <td className="row" style={{ gap: 6, justifyContent: "flex-end", flexWrap: "nowrap" }}>
                       <button className="btn ghost sm" title="Edit" onClick={() => setEdit(e)}><Pencil size={13} /></button>
-                      <button className="btn ghost sm" title="Reset password" onClick={() => resetPw(e.username)}><KeyRound size={13} /></button>
-                      <button className="btn ghost sm" title={e.active === "false" ? "Activate" : "Deactivate"} onClick={() => act(e.username, { action: "active", active: e.active === "false" }, "Updated")}>{e.active === "false" ? "On" : "Off"}</button>
-                      {e.username !== session.username && <button className="btn danger sm" title="Remove" onClick={() => remove(e.username)}><Trash2 size={13} /></button>}
+                      <button className="btn ghost sm" title="Reset password" onClick={() => setResetTarget(e.username)}><KeyRound size={13} /></button>
+                      <button className="btn ghost sm" title={e.active === "false" ? "Activate" : "Deactivate"} onClick={() => act(e.username, { action: "active", active: e.active === "false" }, "Updated").catch((err) => toast(err.message, "error"))}>{e.active === "false" ? "On" : "Off"}</button>
+                      {e.username !== session.username && <button className="btn danger sm" title="Remove" onClick={() => setDelTarget(e.username)}><Trash2 size={13} /></button>}
                     </td>
                   </tr>
                 ))}
@@ -344,6 +416,10 @@ function Employees({ session, toast }: { session: Session; toast: (m: string, k?
 
       {edit && <EditUser user={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); load(); }} toast={toast} />}
       {history && <HistoryModal data={history} onClose={() => setHistory(null)} />}
+      {delTarget && <ConfirmDialog title="Remove user" message={`Remove '${delTarget}'? This permanently deletes the account.`} confirmLabel="Remove" danger
+        onConfirm={async () => { try { await remove(delTarget); } catch (e: any) { toast(e?.message || String(e), "error"); } setDelTarget(null); }} onClose={() => setDelTarget(null)} />}
+      {resetTarget && <PromptDialog title={`Reset password — ${resetTarget}`} label="New password (min 6)" type="password" confirmLabel="Reset"
+        onSubmit={async (v) => { try { await act(resetTarget, { action: "reset", password: v }, `Password reset for '${resetTarget}'`); } catch (e: any) { toast(e?.message || String(e), "error"); } setResetTarget(null); }} onClose={() => setResetTarget(null)} />}
     </>
   );
 }
@@ -461,13 +537,3 @@ function Audit() {
   );
 }
 
-function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
-  return (
-    <div className="modal-scrim" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head"><strong>{title}</strong><button className="icon-btn" onClick={onClose} aria-label="Close"><X size={16} /></button></div>
-        <div className="modal-body">{children}</div>
-      </div>
-    </div>
-  );
-}

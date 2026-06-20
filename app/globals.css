@@ -528,6 +528,18 @@ html[data-theme="dark"] .tpill.t-sick { background: #0c2a33; color: #67e8f9; }
   .leave-top .row { width: 100%; }
 }
 
+/* ranking + bulk action bar */
+.rank { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.rank-row { display: grid; grid-template-columns: 26px 1fr 120px auto; align-items: center; gap: 10px; font-size: 13px; }
+.rank-pos { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; background: var(--accent-soft); color: var(--accent); }
+.rank-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-track { height: 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.rank-fill { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+.rank-val { font-size: 12px; font-weight: 700; color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .rank-row { grid-template-columns: 22px 1fr auto; } .rank-track { display: none; } }
+
+.bulk-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 12px; border-radius: var(--radius-sm); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); font-size: 13px; font-weight: 600; color: var(--accent); flex-wrap: wrap; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }

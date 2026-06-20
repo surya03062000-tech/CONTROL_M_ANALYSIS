@@ -29,6 +29,19 @@ export function expandDates(start: string, end: string): string[] {
   for (let t = s.getTime(); t <= e.getTime(); t += 86400000) out.push(new Date(t).toISOString().slice(0, 10));
   return out;
 }
+export function isWeekend(dateISO: string): boolean {
+  const d = new Date(dateISO + "T00:00:00").getDay();
+  return d === 0 || d === 6; // Sun / Sat
+}
+// Dates that actually count as leave: weekdays that aren't company holidays.
+export function workingDates(start: string, end: string, holidays?: Set<string>): string[] {
+  return expandDates(start, end).filter((d) => !isWeekend(d) && !(holidays?.has(d)));
+}
+// Leave days excluding weekends + holidays (half-day = 0.5 only if that day counts).
+export function computeWorkingDays(start: string, end: string, dayPart: string, holidays?: Set<string>): number {
+  if (isHalf(dayPart)) return workingDates(start, start, holidays).length ? 0.5 : 0;
+  return workingDates(start, end, holidays).length;
+}
 export function typeColor(t: string): string {
   return ({ Holiday: "#DA291C", Unplanned: "#d97706", Sick: "#0891b2", Planned: "#16a34a" } as Record<string, string>)[t] || "#64748b";
 }

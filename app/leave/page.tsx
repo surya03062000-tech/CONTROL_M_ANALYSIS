@@ -8,8 +8,9 @@ import {
 } from "lucide-react";
 import { useToast } from "../components/Toast";
 import LeaveCalendar, { CalCell } from "./LeaveCalendar";
+import { ConfirmDialog } from "./Modal";
 import {
-  LEAVE_TYPES, DAY_PARTS, dayPartLabel, isHalf, genRequestId, expandDates, rangeLabel,
+  LEAVE_TYPES, DAY_PARTS, dayPartLabel, isHalf, genRequestId, expandDates, workingDates, computeWorkingDays, rangeLabel,
 } from "@/lib/leaveShared";
 
 interface Session { username: string; role: string; name: string; must_change?: boolean; }
@@ -90,6 +91,7 @@ function EmployeeView({ session, onChange, toast }: { session: Session; onChange
   const [busy, setBusy] = useState(false);
   const [reqs, setReqs] = useState<Req[]>([]);
   const [pwOpen, setPwOpen] = useState(!!session.must_change);
+  const [cancelTarget, setCancelTarget] = useState<string | null>(null);
 
   const [calMonth, setCalMonth] = useState(monthOf(start));
   const [avail, setAvail] = useState<Record<string, number>>({});
@@ -113,13 +115,16 @@ function EmployeeView({ session, onChange, toast }: { session: Session; onChange
     return Math.max(0, ...dates.map((d) => avail[d] || 0));
   }, [start, end, multi, avail]);
 
+  const holSet = useMemo(() => new Set(Object.keys(holidays)), [holidays]);
+  const wdays = useMemo(() => computeWorkingDays(start, multi ? end : start, multi ? "full" : dayPart, holSet), [start, end, multi, dayPart, holSet]);
+
   const cells: Record<string, CalCell> = useMemo(() => {
     const c: Record<string, CalCell> = {};
     Object.entries(avail).forEach(([d, n]) => { c[d] = { ...(c[d] || {}), count: n }; });
     Object.entries(holidays).forEach(([d, name]) => { c[d] = { ...(c[d] || {}), holiday: name }; });
-    reqs.forEach((r) => expandDates(r.start_date, r.end_date).forEach((d) => { if (monthOf(d) === calMonth) c[d] = { ...(c[d] || {}), mine: true }; }));
+    reqs.forEach((r) => workingDates(r.start_date, r.end_date, holSet).forEach((d) => { if (monthOf(d) === calMonth) c[d] = { ...(c[d] || {}), mine: true }; }));
     return c;
-  }, [avail, holidays, reqs, calMonth]);
+  }, [avail, holidays, reqs, calMonth, holSet]);
 
   function resetForm() {
     setEditing(null); setType("Planned"); setStart(todayISO()); setMulti(false); setEnd(todayISO());
@@ -144,8 +149,7 @@ function EmployeeView({ session, onChange, toast }: { session: Session; onChange
       resetForm(); loadReqs(); loadAvail(calMonth);
     } catch (e: any) { toast(e?.message || String(e), "error"); } finally { setBusy(false); }
   }
-  async function cancel(id: string) {
-    if (!confirm("Withdraw this leave?")) return;
+  async function doCancel(id: string) {
     try { const r = await fetch(`/api/leave/requests/${encodeURIComponent(id)}`, { method: "DELETE" }); const d = await r.json(); if (!r.ok) throw new Error(d.error || "Failed"); toast("Leave withdrawn", "info"); if (editing === id) resetForm(); loadReqs(); loadAvail(calMonth); }
     catch (e: any) { toast(e?.message || String(e), "error"); }
   }
@@ -217,7 +221,8 @@ function EmployeeView({ session, onChange, toast }: { session: Session; onChange
               </div>
             </div>
 
-            {overlap > 0 && <div className="note" style={{ marginTop: 14, background: "var(--warn-bg)", color: "var(--warn)", border: "1px solid color-mix(in srgb, var(--warn) 30%, transparent)" }}><AlertTriangle size={14} /> {overlap} teammate{overlap === 1 ? "" : "s"} already off on the selected date(s).</div>}
+            <div className="muted small" style={{ marginTop: 14 }}>Counts as <b style={{ color: wdays > 0 ? "var(--ok)" : "var(--err)" }}>{wdays} working day{wdays === 1 ? "" : "s"}</b> — weekends &amp; holidays are excluded.</div>
+            {overlap > 0 && <div className="note" style={{ marginTop: 10, background: "var(--warn-bg)", color: "var(--warn)", border: "1px solid color-mix(in srgb, var(--warn) 30%, transparent)" }}><AlertTriangle size={14} /> {overlap} teammate{overlap === 1 ? "" : "s"} already off on the selected date(s).</div>}
 
             <div className="row" style={{ marginTop: 16 }}>
               <button className="btn primary" onClick={submit} disabled={busy}>
@@ -250,7 +255,7 @@ function EmployeeView({ session, onChange, toast }: { session: Session; onChange
                         <td>{r.reason}</td>
                         <td className="row" style={{ gap: 6, justifyContent: "flex-end" }}>
                           <button className="btn ghost sm" onClick={() => startEdit(r)}><Pencil size={13} /></button>
-                          <button className="btn danger sm" onClick={() => cancel(r.request_id)}><Trash2 size={13} /></button>
+                          <button className="btn danger sm" onClick={() => setCancelTarget(r.request_id)}><Trash2 size={13} /></button>
                         </td>
                       </tr>
                     ))}
@@ -261,6 +266,9 @@ function EmployeeView({ session, onChange, toast }: { session: Session; onChange
           </section>
         </>
       )}
+
+      {cancelTarget && <ConfirmDialog title="Withdraw leave" message={`Withdraw leave ${cancelTarget}? This removes the record.`} confirmLabel="Withdraw" danger
+        onConfirm={async () => { await doCancel(cancelTarget); setCancelTarget(null); }} onClose={() => setCancelTarget(null)} />}
     </div>
   );
 }
