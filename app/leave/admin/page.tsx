@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ShieldCheck, LogOut, Loader2, Lock, UserPlus, Trash2, KeyRound, Pencil, X,
-  LayoutDashboard, Users, Mail, Save, CalendarDays, Download, Send, Plus, ScrollText, AlertTriangle,
+  LayoutDashboard, Users, Mail, Save, CalendarDays, FileSpreadsheet, Send, Plus, ScrollText, AlertTriangle,
 } from "lucide-react";
 import { useToast } from "../../components/Toast";
 import LeaveCalendar, { CalCell } from "../LeaveCalendar";
@@ -112,6 +112,24 @@ function Dashboard({ toast }: { toast: (m: string, k?: any) => void }) {
   const [loading, setLoading] = useState(false);
   const [fEmp, setFEmp] = useState(""); const [fType, setFType] = useState("all");
   const [busyMail, setBusyMail] = useState(false);
+  // Excel report period
+  const [rpt, setRpt] = useState<"month" | "year" | "custom">("month");
+  const [ry, setRy] = useState(thisMonth().slice(0, 4));
+  const [rFrom, setRFrom] = useState(thisMonth() + "-01");
+  const [rTo, setRTo] = useState(new Date().toISOString().slice(0, 10));
+  function lastDayOf(m: string) { const [y, mm] = m.split("-").map(Number); return `${m}-${String(new Date(y, mm, 0).getDate()).padStart(2, "0")}`; }
+  function reportRange() {
+    if (rpt === "year") return { from: `${ry}-01-01`, to: `${ry}-12-31`, label: String(ry) };
+    if (rpt === "custom") return { from: rFrom, to: rTo, label: `${rFrom}_to_${rTo}` };
+    return { from: `${month}-01`, to: lastDayOf(month), label: month };
+  }
+  function downloadExcel() {
+    const { from, to, label } = reportRange();
+    if (!from || !to || from > to) { toast("Pick a valid period", "error"); return; }
+    const a = document.createElement("a");
+    a.href = `/api/leave/admin/export?from=${from}&to=${to}&label=${encodeURIComponent(label)}`;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [month]);
   async function load() {
@@ -137,15 +155,46 @@ function Dashboard({ toast }: { toast: (m: string, k?: any) => void }) {
     return c;
   }, [filtered, month]);
 
+  const monthLong = new Date(month + "-01T00:00:00").toLocaleString(undefined, { month: "long", year: "numeric" });
+
   return (
     <>
-      <section className="card">
-        <div className="card-head"><span className="step-num"><LayoutDashboard size={15} /></span><h2>Who is on leave</h2>
-          <div className="row" style={{ marginLeft: "auto", gap: 8 }}>
-            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ width: "auto" }} />
-            <a className="btn ghost sm" href={`/api/leave/admin/export?month=${month}`}><Download size={15} /> CSV</a>
+      <div className="dash-hero">
+        <div className="dash-hero-main">
+          <div className="dash-hero-greet">Leave overview</div>
+          <h2>{monthLong}</h2>
+          <p>{people} {people === 1 ? "person" : "people"} on leave · {leaves.length} record{leaves.length === 1 ? "" : "s"} this month</p>
+        </div>
+        <div className="dash-hero-mini">
+          {counts.map((c) => (<span key={c.t} className="mini-chip"><i style={{ background: typeColor(c.t) }} />{c.t} <b>{c.n}</b></span>))}
+        </div>
+      </div>
+
+      <section className="card report-card">
+        <div className="card-head"><span className="step-num"><FileSpreadsheet size={15} /></span><h2>Generate Excel report</h2></div>
+        <div className="seg">
+          {(["month", "year", "custom"] as const).map((k) => (
+            <button key={k} className={`seg-btn ${rpt === k ? "active" : ""}`} onClick={() => setRpt(k)}>{k === "month" ? "Monthly" : k === "year" ? "Yearly" : "Custom period"}</button>
+          ))}
+        </div>
+        <div className="report-inputs">
+          {rpt === "month" && <div><label>Month</label><input type="month" value={month} onChange={(e) => setMonth(e.target.value)} /></div>}
+          {rpt === "year" && <div><label>Year</label><input type="number" min="2000" max="2100" value={ry} onChange={(e) => setRy(e.target.value)} /></div>}
+          {rpt === "custom" && (<>
+            <div><label>From</label><input type="date" value={rFrom} onChange={(e) => setRFrom(e.target.value)} /></div>
+            <div><label>To</label><input type="date" value={rTo} min={rFrom} onChange={(e) => setRTo(e.target.value)} /></div>
+          </>)}
+          <div className="report-actions">
+            <button className="btn primary sm" onClick={downloadExcel}><FileSpreadsheet size={15} /> Download Excel</button>
             <button className="btn ghost sm" onClick={emailSummary} disabled={busyMail}>{busyMail ? <Loader2 size={14} className="spin" /> : <Send size={15} />} Email summary</button>
           </div>
+        </div>
+        <div className="muted small" style={{ marginTop: 10 }}>Includes employee name, leave dates, duration, days, reason &amp; Request ID — plus a per-employee summary sheet.</div>
+      </section>
+
+      <section className="card">
+        <div className="card-head"><span className="step-num"><LayoutDashboard size={15} /></span><h2>Who is on leave</h2>
+          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ width: "auto", marginLeft: "auto" }} />
         </div>
 
         <div className="stats five">
