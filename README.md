@@ -129,10 +129,35 @@ app/
     cancel/route.ts       POST → jobs/runs/cancel
     outputs/route.ts      GET  → recent .xlsx outputs in the Volume (run history)
     download/route.ts     GET  → Files API stream of the .xlsx
+  leave/page.tsx          Leave Request — employee sign-in, calendar leave, my records
+  leave/admin/page.tsx    Leave admin — monthly dashboard, employees, notifications
+  api/leave/*             login/logout/me/password/requests + admin users/leaves/config
 lib/databricks.ts         server-only Databricks REST client (run/status/upload/cancel/list/download)
+lib/leaveDb.ts            Leave store — Databricks SQL Statement Execution on Delta tables
+lib/leaveAuth.ts          session (jose JWT cookie) + bcrypt password hashing
+lib/email.ts              optional email via Resend
 databricks-job.json       job definition for the CLI
 .env.example              env var template
 ```
+
+## Leave Request module
+
+A self-contained tool at **`/leave`** (employees) and **`/leave/admin`** (admins). Everything
+is stored in **Databricks Delta tables** (`leave_users`, `leave_requests`, `leave_config`)
+via the SQL Statement Execution API.
+
+1. Create a **SQL Warehouse** (serverless recommended) and set `DATABRICKS_WAREHOUSE_ID`.
+   The token needs SQL access + create/read/write on `LEAVE_CATALOG.LEAVE_SCHEMA`.
+2. Set a strong `AUTH_SECRET` (signs the session cookie) and `LEAVE_ADMIN_PASSWORD`
+   (seeds the `admin` account on first run — change it after first login).
+3. (Optional) Set `RESEND_API_KEY` + `LEAVE_FROM_EMAIL` so leave submissions email the
+   admin-configured recipients.
+
+**Employee:** sign in → pick leave type (Holiday / Unplanned / Sick / Planned), date(s),
+full/half day, reason → submit (a Request ID is generated, recipients are emailed).
+Can change their own password. **Admin** (admin-only login): monthly dashboard of who's on
+leave, add/remove employees, reset passwords, and configure the notification recipients.
+Tables auto-create on first login; the `admin` account is seeded automatically.
 
 ## Notes / troubleshooting
 - **401 from Databricks** → token expired or lacks job/Files permission.
