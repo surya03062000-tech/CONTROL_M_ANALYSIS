@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { uploadFileTo } from "@/lib/databricks";
-import { createTablesFromRows, DG_CATALOG, type ColDef } from "@/lib/dg";
+import { createTablesFromRows, DG_CATALOG, type ColDef, type DgEvent } from "@/lib/dg";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -32,16 +32,14 @@ async function parseExcel(buf: Buffer): Promise<ColDef[]> {
   const rows: ColDef[] = [];
   ws.eachRow((row, rn) => {
     if (rn === 1) return;
-    const schema = cellText(row.getCell(cS).value);
-    const table = cellText(row.getCell(cT).value);
-    const column = cellText(row.getCell(cC).value);
-    const dataType = cellText(row.getCell(cD).value);
+    const schema = cellText(row.getCell(cS).value), table = cellText(row.getCell(cT).value);
+    const column = cellText(row.getCell(cC).value), dataType = cellText(row.getCell(cD).value);
     if (schema && table && column && dataType) rows.push({ schema, table, column, dataType });
   });
   return rows;
 }
 
-// Streams plain-text log lines as schemas/tables are created in edl_qa.
+// Streams newline-delimited JSON events (logs, per-table rows, progress, summary).
 export async function POST(req: NextRequest) {
   if (!gate(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const form = await req.formData();
@@ -50,31 +48,31 @@ export async function POST(req: NextRequest) {
   const f = file as File;
   if (!/\.(xlsx|xls)$/i.test(f.name)) return NextResponse.json({ error: "Please upload an .xlsx file." }, { status: 400 });
   const buf = Buffer.from(await f.arrayBuffer());
+  const dryRun = form.get("dryRun") === "1";
 
   const stream = new ReadableStream({
     async start(controller) {
       const enc = new TextEncoder();
-      const log = (line: string) => controller.enqueue(enc.encode(line + "\n"));
+      const send = (e: DgEvent | { t: string; [k: string]: any }) => controller.enqueue(enc.encode(JSON.stringify(e) + "\n"));
       try {
-        log(`Uploading "${f.name}" to the volume…`);
+        // #14 timestamped copy into the volume + keep original name in the log
+        const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        const stored = f.name.replace(/\.(xlsx|xls)$/i, "") + `_${ts}.xlsx`;
         if (DG_INPUT_VOLUME) {
-          try { const { path } = await uploadFileTo(DG_INPUT_VOLUME, f.name, buf); log(`✓ uploaded → ${path}`); }
-          catch (e: any) { log(`⚠ volume upload skipped: ${e?.message || e}`); }
-        } else { log("⚠ no DG_INPUT_VOLUME configured — skipping volume copy."); }
-
-        log("Reading spreadsheet…");
+          try { const { path } = await uploadFileTo(DG_INPUT_VOLUME, stored, buf); send({ t: "log", line: `✓ uploaded → ${path}` }); }
+          catch (e: any) { send({ t: "log", line: `⚠ volume upload skipped: ${e?.message || e}` }); }
+        }
+        send({ t: "log", line: "Reading spreadsheet…" });
         const rows = await parseExcel(buf);
-        if (!rows.length) { log("✗ No valid rows. Need columns: Schema, Table Name, Column Name, Data Type."); return; }
-        log(`Creating in catalog: ${DG_CATALOG}`);
-        await createTablesFromRows(rows, DG_CATALOG, log);
-        log("__DONE__");
+        if (!rows.length) { send({ t: "log", line: "✗ No valid rows. Need columns: Schema, Table Name, Column Name, Data Type." }); send({ t: "done" }); return; }
+        if (dryRun) { send({ t: "log", line: `Dry-run: ${rows.length} row(s) parsed. No changes made.` }); send({ t: "done", dryRun: true }); return; }
+        send({ t: "log", line: `Creating in catalog: ${DG_CATALOG}` });
+        await createTablesFromRows(rows, DG_CATALOG, send);
+        send({ t: "done" });
       } catch (e: any) {
-        log(`✗ Error: ${e?.message || e}`);
-      } finally {
-        controller.close();
-      }
+        send({ t: "log", line: `✗ Error: ${e?.message || e}` }); send({ t: "done" });
+      } finally { controller.close(); }
     },
   });
-
-  return new Response(stream, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
+  return new Response(stream, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" } });
 }

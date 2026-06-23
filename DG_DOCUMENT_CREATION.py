@@ -41,6 +41,28 @@ client = OpenAI(
     base_url="https://dbc-62e8955c-3011.cloud.databricks.com/ai-gateway/mlflow/v1"
 )
 
+# Track LLM token usage across the run (surfaced in the notebook exit JSON).
+LLM_USAGE = {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+def _track_usage(fn):
+    def _inner(*a, **k):
+        r = fn(*a, **k)
+        try:
+            u = getattr(r, "usage", None)
+            if u:
+                LLM_USAGE["calls"] += 1
+                LLM_USAGE["prompt_tokens"]     += int(getattr(u, "prompt_tokens", 0) or 0)
+                LLM_USAGE["completion_tokens"] += int(getattr(u, "completion_tokens", 0) or 0)
+                LLM_USAGE["total_tokens"]      += int(getattr(u, "total_tokens", 0) or 0)
+        except Exception:
+            pass
+        return r
+    return _inner
+try:
+    client.chat.completions.create = _track_usage(client.chat.completions.create)
+    client.embeddings.create = _track_usage(client.embeddings.create)
+except Exception as _e:
+    print(f"[WARN] LLM usage tracking not enabled: {_e}")
+
 # COMMAND ----------
 
 dbutils.widgets.text('CATALOG','')
@@ -54,6 +76,23 @@ CATALOG = dbutils.widgets.get('CATALOG')
 SCHEMA_CSV  = dbutils.widgets.get('SCHEMA') 
 TABLE_CSV   = dbutils.widgets.get('TABLE_NAME') 
 TABLE_DESCRIPTION = dbutils.widgets.get('TABLE_DESCRIPTION')
+
+# Per-table descriptions: TABLE_DESCRIPTION may be a JSON map
+# {"schema.table": "...", "_default": "..."} (sent by the website) or a plain
+# string applied to all tables.
+import json as _json_desc
+_DESC_MAP = None
+try:
+    if TABLE_DESCRIPTION.strip().startswith("{"):
+        _p = _json_desc.loads(TABLE_DESCRIPTION)
+        if isinstance(_p, dict):
+            _DESC_MAP = _p
+except Exception:
+    _DESC_MAP = None
+def _desc_for(schema, table):
+    if _DESC_MAP:
+        return _DESC_MAP.get(f"{schema}.{table}") or _DESC_MAP.get("_default", "") or ""
+    return TABLE_DESCRIPTION
 
 # COMMAND ----------
 
@@ -1096,7 +1135,7 @@ for cat, sch, tbl in TABLES_TO_PROCESS:
         
         dg_df = process_single_table(
             cat, sch, tbl, 
-            TABLE_DESCRIPTION, 
+            _desc_for(sch, tbl),
             PLATFORM_SYSTEM_NAME, 
             DATABASE_STORAGE_NAME
         )
@@ -1110,7 +1149,7 @@ for cat, sch, tbl in TABLES_TO_PROCESS:
         desc_created = len(pdf[pdf['Business Description'].notna() & (pdf['Business Description'] != '')])
                         
         ai_scores = compute_logit_scores(
-            table_description=TABLE_DESCRIPTION,
+            table_description=_desc_for(sch, tbl),
             pdf=pdf,
             pii_map_ref=None  
         )
@@ -1245,6 +1284,7 @@ _result = {
     "columns": sum(m.get("total_columns", 0) for m in table_metrics),
     "pii_columns": sum(m.get("pii_columns", 0) for m in table_metrics),
     "descriptions_created": sum(m.get("descriptions_created", 0) for m in table_metrics),
+    "llm_usage": LLM_USAGE,
 }
 print(f"[DONE] {_result}")
 try:

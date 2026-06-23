@@ -84,6 +84,15 @@ body {
 .rogers-word { font-size: 21px; font-weight: 900; letter-spacing: .4px; color: var(--accent); }
 .brand-tag { font-size: 10.5px; font-weight: 600; color: var(--muted); letter-spacing: .4px; text-transform: uppercase; margin-top: 2px; }
 
+/* OpsCentral brand lockup */
+.ops-lockup { display: inline-flex; align-items: center; gap: 7px; }
+.dai-badge { background: var(--accent); color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .3px; padding: 3px 6px; border-radius: 6px; line-height: 1; }
+.dai-badge.light { background: #fff; color: var(--accent); vertical-align: middle; }
+.ops-word { font-size: 19px; font-weight: 900; letter-spacing: -.2px; }
+.ops { color: #0b2545; }
+.central { color: var(--muted); }
+html[data-theme="dark"] .ops { color: #cdd7ea; }
+
 .side-nav { display: flex; flex-direction: column; gap: 3px; }
 .nav-item {
   position: relative; display: flex; align-items: center; gap: 11px; padding: 11px 12px; min-height: 44px;
@@ -367,7 +376,11 @@ input.err { border-color: var(--err); }
   opacity: .12; filter: brightness(0) invert(1); transform: rotate(8deg); pointer-events: none;
 }
 .hero-greeting { font-size: 14px; font-weight: 600; opacity: .9; }
-.hero h1 { font-size: 28px; font-weight: 800; letter-spacing: -.5px; margin: 6px 0 6px; color: #fff; -webkit-text-fill-color: #fff; }
+.hero h1 { font-size: 30px; font-weight: 900; letter-spacing: -.5px; margin: 6px 0 6px; color: #fff; -webkit-text-fill-color: #fff; display: flex; align-items: center; gap: 10px; }
+.hero-ops { color: #fff; }
+.hero-central { color: rgba(255,255,255,.82); }
+.hero-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.hero-chip { display: inline-flex; align-items: center; gap: 7px; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.25); color: #fff; padding: 7px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; }
 .hero-tag { font-size: 14.5px; font-weight: 600; font-style: italic; opacity: .96; margin: 0; }
 .hero-sub { font-size: 13.5px; opacity: .9; margin: 12px 0 0; max-width: 640px; }
 
