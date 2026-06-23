@@ -49,11 +49,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="side-brand">
             <RogersLogo />
             <div className="side-brand-text">
-              <span className="rogers-word">ROGERS</span>
-              <span className="brand-tag">Data Engineering</span>
+              <span className="ops-lockup"><span className="dai-badge">D&amp;AI</span><span className="ops-word"><span className="ops">Ops</span><span className="central">Central</span></span></span>
+              <span className="brand-tag">Rogers Data Engineering</span>
             </div>
           </div>
-          <div className="side-tagline">Powering D&amp;AI Teams, One Tool at a Time</div>
+          <div className="side-tagline">One hub for Data &amp; AI Operations</div>
 
           <nav className="side-nav">
             {NAV.map((n) => {
@@ -91,7 +91,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <button className="icon-btn menu-btn" aria-label="Menu" onClick={() => setOpen((v) => !v)}>
               {open ? <X size={18} /> : <Menu size={18} />}
             </button>
-            <span className="app-tagline">Powering D&amp;AI Teams, One Tool at a Time</span>
+            <span className="app-tagline">OpsCentral · One hub for Data &amp; AI Operations</span>
             <div className="topbar-spacer" />
             <InstallButton />
             <ThemeToggle />

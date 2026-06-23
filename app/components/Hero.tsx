@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Share2, Workflow, Users } from "lucide-react";
 
 export default function Hero() {
   const [greeting, setGreeting] = useState("Welcome");
@@ -12,9 +13,13 @@ export default function Hero() {
   return (
     <div className="hero">
       <div className="hero-greeting">{greeting} 👋</div>
-      <h1>Data Engineering Portal</h1>
-      <p className="hero-tag">Powering D&amp;AI Teams, One Tool at a Time</p>
-      <p className="hero-sub">Self-service tools for the Rogers Data Engineering team. Pick a tool to get started.</p>
+      <h1><span className="dai-badge light">D&amp;AI</span> <span className="hero-ops">Ops</span><span className="hero-central">Central</span></h1>
+      <p className="hero-tag">One hub for Data &amp; AI Operations</p>
+      <div className="hero-chips">
+        <span className="hero-chip"><Share2 size={14} /> One hub</span>
+        <span className="hero-chip"><Workflow size={14} /> Every workflow</span>
+        <span className="hero-chip"><Users size={14} /> Data &amp; AI team</span>
+      </div>
     </div>
   );
 }

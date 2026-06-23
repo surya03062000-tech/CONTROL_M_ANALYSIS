@@ -145,6 +145,21 @@ export async function downloadFile(absPath: string): Promise<Response> {
   return dbx(`/api/2.0/fs/files${encodePath(absPath)}`, { method: "GET" });
 }
 
+// List .xlsx files in any Volume folder (newest first) — used by the DG tool.
+export async function listVolumeXlsx(volume: string): Promise<OutputFile[]> {
+  if (!HOST || !TOKEN) return [];
+  const vol = (volume || "").replace(/\/+$/, "");
+  if (!vol) return [];
+  const res = await dbx(`/api/2.0/fs/directories${encodePath(vol)}`, { method: "GET" });
+  if (!res.ok) return [];
+  const j = await res.json();
+  const entries: any[] = j?.contents || [];
+  return entries
+    .filter((e) => !e.is_directory && String(e.path).toLowerCase().endsWith(".xlsx"))
+    .map((e) => ({ path: e.path as string, name: String(e.path).split("/").pop() as string, size: Number(e.file_size ?? 0), modified: Number(e.last_modified ?? 0) }))
+    .sort((a, b) => b.modified - a.modified);
+}
+
 // Upload a file into an arbitrary Volume folder (used by the DG tool).
 export async function uploadFileTo(volume: string, filename: string, data: Buffer | Uint8Array): Promise<{ path: string }> {
   if (!HOST || !TOKEN) throw new Error("Missing DATABRICKS_HOST / DATABRICKS_TOKEN.");

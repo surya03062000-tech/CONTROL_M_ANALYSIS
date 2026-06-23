@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Rogers Data Engineering Portal",
-    short_name: "D&AI Portal",
-    description: "Powering D&AI Teams, One Tool at a Time",
+    name: "OpsCentral — Rogers D&AI",
+    short_name: "OpsCentral",
+    description: "One hub for Data & AI Operations",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

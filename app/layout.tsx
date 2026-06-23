@@ -6,11 +6,11 @@ import AppShell from "./components/AppShell";
 const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Rogers Data Engineering Portal",
-  description: "Powering D&AI Teams, One Tool at a Time — Control-M lineage analysis, diagrams, and Excel dashboards.",
-  applicationName: "D&AI Portal",
+  title: "OpsCentral — Rogers D&AI",
+  description: "OpsCentral — one hub for Data & AI Operations. Control-M lineage, DG documents, leave tracking and more.",
+  applicationName: "OpsCentral",
   icons: { icon: "/icon.svg", apple: "/icon-192.png" },
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "D&AI Portal" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "OpsCentral" },
 };
 
 export const viewport: Viewport = {
