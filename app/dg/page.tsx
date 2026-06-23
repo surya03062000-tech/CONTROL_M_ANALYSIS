@@ -170,14 +170,14 @@ function Step2({ password, toast }: { password: string; toast: (m: string, k?: a
 
   async function create() {
     const sch = selSchemas.join(",");
-    const tbl = [...selTables].map((k) => k.split(".").slice(1).join(".")).join(","); // table part after schema
+    const tbl = [...selTables].join(","); // full "schema.table" keys (notebook accepts schema.table)
     if (!sch) { toast("Select at least one schema", "error"); return; }
     if (!selTables.size) { toast("Select at least one table", "error"); return; }
     if (!desc.trim()) { toast("Business description is required", "error"); return; }
     setPhase("running"); setStatus(null); setLogs([]); setRunId(null);
     log("submitting…");
     try {
-      const r = await fetch("/api/dg/create", { method: "POST", headers: { "Content-Type": "application/json", ...(password ? { "x-app-password": password } : {}) }, body: JSON.stringify({ schemas: sch, tables: [...selTables].map((k) => k.split(".").slice(1).join(".")).join(","), description: desc }) });
+      const r = await fetch("/api/dg/create", { method: "POST", headers: { "Content-Type": "application/json", ...(password ? { "x-app-password": password } : {}) }, body: JSON.stringify({ schemas: sch, tables: tbl, description: desc }) });
       const d = await r.json(); if (!r.ok) throw new Error(d.error || "Failed");
       setRunId(d.run_id); log(`triggered job · run ${d.run_id}`); startPolling(d.run_id);
     } catch (e: any) { setPhase("error"); log(`✗ ${e?.message || e}`); toast(e?.message || "Failed", "error"); }

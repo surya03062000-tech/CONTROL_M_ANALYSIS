@@ -18,7 +18,7 @@ dbutils.library.restartPython()
 from openai import OpenAI
 import os, json, re, math, time
 import fitz  
-import os, re, ssl, smtplib
+import os, re
 import random
 from datetime import datetime
 
@@ -29,10 +29,6 @@ from openpyxl.utils import get_column_letter
 from openpyxl.chart import BarChart, Reference
 from openpyxl.chart.series import DataPoint
 
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
 
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
@@ -112,23 +108,6 @@ DATABASE_STORAGE_NAME = "Default Fallback"
 POLICY_EMBEDDINGS_TABLE = "edl_qa.drvd__app_erp.rogers_pii_policy_embeddings"
 REBUILD_POLICY_INDEX = False
 
-SMTP_HOST = "smtp.gmail.com"            
-SMTP_PORT = 587                         
-SMTP_USER = "databricksmailqa@gmail.com" 
-SMTP_PASS = "lqnswamiucfwarvn"            
-EMAIL_FROM = SMTP_USER
-EMAIL_TO  = ["christmasanta202512@gmail.com"]
-# EMAIL_CC = []
-EMAIL_CC  = [
-    "Guru.Elangovan@gmail.com",
-    "mgheethamp@gmail.com",
-    "sanyal.abhi@gmail.com",
-    "snekavelu278@gmail.com",
-    "srinivasans0730@gmail.com",
-    "sairam.kumaran1610@gmail.com",
-    "surya03062000@gmail.com"
-]
-EMAIL_BCC = ["databricksmailqa@gmail.com"] 
 
 
 # COMMAND ----------
@@ -1095,109 +1074,6 @@ def compute_logit_scores(table_description: str, pdf, pii_map_ref) -> dict:
     }
 
 
-def add_ai_metrics_sheet(wb, table_name: str, schema_name: str, ai_scores: dict):
-    """
-    Add an AI_Metrics_<table> sheet to the open workbook wb.
-    Contains:
-      Section A  — table-level KPI summary block (rows 1-8)
-      Section B  — per-column detail table (from row 10)
-      Section C  — native openpyxl BarChart showing overall_logit per column
-    """
-    raw_sheet = f"AI_{schema_name}_{table_name}"
-    sheet_name = raw_sheet[:31]
-
-    if sheet_name in wb.sheetnames:
-        del wb[sheet_name]
-    ws = wb.create_sheet(title=sheet_name)
-
-    hdr_font  = Font(name="Times New Roman", size=11, bold=True, color="FFFFFF")
-    hdr_fill  = PatternFill("solid", fgColor="1E3A8A")
-    hdr_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-    kpi_label_font = Font(name="Times New Roman", size=10, bold=True)
-    kpi_val_font   = Font(name="Times New Roman", size=10)
-    body_font      = Font(name="Times New Roman", size=10)
-    body_align     = Alignment(horizontal="left", vertical="top", wrap_text=True)
-    center_align   = Alignment(horizontal="center", vertical="center")
-
-    green_fill  = PatternFill("solid", fgColor="C6EFCE")
-    amber_fill  = PatternFill("solid", fgColor="FFEB9C")
-    red_fill    = PatternFill("solid", fgColor="FFC7CE")
-    darkred_fill= PatternFill("solid", fgColor="FF9999")
-
-    label_fill_map = {
-        "High":     green_fill,
-        "Medium":   amber_fill,
-        "Low":      red_fill,
-        "Very Low": darkred_fill,
-    }
-
-    ws.merge_cells("A1:D1")
-    ws["A1"] = f"AI Metrics — {schema_name}.{table_name}"
-    ws["A1"].font = Font(name="Times New Roman", size=13, bold=True, color="FFFFFF")
-    ws["A1"].fill = PatternFill("solid", fgColor="1E3A8A")
-    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
-
-    kpi_rows = [
-        ("Table",             f"{schema_name}.{table_name}"),
-        ("Table Description", ai_scores["table_description"][:200]),
-        ("Total Columns",     ai_scores["total_cols"]),
-    ]
-
-    for r_idx, (label, value) in enumerate(kpi_rows, start=2):
-        ws.cell(row=r_idx, column=1, value=label).font = kpi_label_font
-        ws.cell(row=r_idx, column=1).fill = PatternFill("solid", fgColor="DBEAFE")
-        val_cell = ws.cell(row=r_idx, column=2, value=value)
-        val_cell.font = kpi_val_font
-
-    separator_row = len(kpi_rows) + 3   
-
-    col_headers = [
-        "Column Name",
-        "AI Business Description (truncated)",
-        "Business Context Inference",
-        "LLM Knowledge Based Context Inference",
-    ]
-    for c_idx, hdr in enumerate(col_headers, start=1):
-        cell = ws.cell(row=separator_row, column=c_idx, value=hdr)
-        cell.font      = hdr_font
-        cell.fill      = hdr_fill
-        cell.alignment = hdr_align
-
-    data_start_row = separator_row + 1
-    for r_offset, row_data in enumerate(ai_scores["col_rows"]):
-        r = data_start_row + r_offset
-
-        # Col A: Column Name
-        ws.cell(r, 1, row_data["column_name"]).font = body_font
-
-        # Col B: AI Business Description
-        ws.cell(r, 2, row_data["business_description"]).font = body_font
-
-        # Col C: Business Context Inference = desc_pct (cosine similarity %)
-        bci_val = row_data["desc_pct"]   # already formatted as "XX.XX%"
-        ws.cell(r, 3, bci_val).font = body_font
-
-        # Col D: LLM Knowledge Based Context Inference = 100 - desc_pct
-        try:
-            desc_num = float(str(row_data["desc_pct"]).replace("%", ""))
-            llm_val  = f"{round(100.0 - desc_num, 2)}%"
-        except Exception:
-            llm_val  = ""
-        ws.cell(r, 4, llm_val).font = body_font
-
-        for c in range(1, 5):
-            ws.cell(r, c).alignment = body_align
-
-    ws.column_dimensions["A"].width = 30
-    ws.column_dimensions["B"].width = 55
-    ws.column_dimensions["C"].width = 28
-    ws.column_dimensions["D"].width = 38
-
-    n_cols = len(ai_scores["col_rows"])
-    print(f"[AI_METRICS] Sheet '{sheet_name}' created — {n_cols} column rows written")
-
-
 print("[AI_METRICS functions defined — placeholder print for verification]")
 
 print(f"[INFO] Starting processing of {len(TABLES_TO_PROCESS)} table(s)...")
@@ -1297,16 +1173,10 @@ if len(all_dg_dfs) == 1:
 else:
     dg_file_name = f"DG_Multiple_Tables_{ts}.xlsx"
 
-# ── Workbook 2: AI Metrics ────────────────────────────────────────────────
-if len(all_dg_dfs) == 1:
-    ai_file_name = f"AI_Metrics_{all_dg_dfs[0]['table']}_{ts}.xlsx"
-else:
-    ai_file_name = f"AI_Metrics_Multiple_Tables_{ts}.xlsx"
 
 local_dir = "/tmp/dg_outputs"
 os.makedirs(local_dir, exist_ok=True)
 local_dg_xlsx   = os.path.join(local_dir, dg_file_name)
-local_ai_xlsx   = os.path.join(local_dir, ai_file_name)
 
 # ── Build Workbook 1: DG Details (one sheet per table) ───────────────────
 with pd.ExcelWriter(local_dg_xlsx, engine="openpyxl") as writer:
@@ -1345,395 +1215,39 @@ for sheet_name in wb_dg.sheetnames:
 wb_dg.save(local_dg_xlsx)
 print(f"[OK] DG workbook created: {local_dg_xlsx}  sheets={wb_dg.sheetnames}")
 
-# ── Build Workbook 2: AI Metrics (one sheet per table via add_ai_metrics_sheet) ─
-# Create an empty workbook first then add one sheet per table
-from openpyxl import Workbook as _Workbook
-wb_ai = _Workbook()
-wb_ai.remove(wb_ai.active)   # remove the default blank sheet
-
-for item, metric in zip(all_dg_dfs, table_metrics):
-    if 'ai_scores' in metric and metric['ai_scores']:
-        add_ai_metrics_sheet(
-            wb          = wb_ai,
-            table_name  = item['table'],
-            schema_name = item['schema'],
-            ai_scores   = metric['ai_scores'],
-        )
-
-wb_ai.save(local_ai_xlsx)
-print(f"[OK] AI Metrics workbook created: {local_ai_xlsx}  sheets={wb_ai.sheetnames}")
 
 # COMMAND ----------
 
-def _ensure_list(x):
-    """
-    Normalize recipient input to list[str].
-    Accepts: list/tuple/set, comma-separated string, single string, None.
-    """
-    if x is None:
-        return []
-    if isinstance(x, (list, tuple, set)):
-        return [str(i).strip() for i in x if i and str(i).strip()]
-    if isinstance(x, str):
-        parts = [p.strip() for p in x.replace(";", ",").split(",")]
-        return [p for p in parts if p]
-    return [str(x).strip()] if str(x).strip() else []
-
-
-def send_email_framework_style(
-    smtp_host, smtp_port, smtp_user, smtp_pass,
-    from_addr, to_addrs, cc_addrs, bcc_addrs,
-    subject, html_body,
-    attachment_paths
-):
-    """
-    multipart/mixed
-      ├── text/html
-      └── xlsx attachment(s)
-
-    attachment_paths : list[(local_path, filename)]
-    """
-
-    to_addrs  = _ensure_list(to_addrs)
-    cc_addrs  = _ensure_list(cc_addrs)
-    bcc_addrs = _ensure_list(bcc_addrs)
-    
-    print(f"[EMAIL DEBUG] After _ensure_list processing:")
-    print(f"  TO ({len(to_addrs)}): {to_addrs}")
-    print(f"  CC ({len(cc_addrs)}): {cc_addrs}")
-    print(f"  BCC ({len(bcc_addrs)}): {bcc_addrs}")
-
-    msg = MIMEMultipart("mixed")
-    msg["Subject"] = subject
-    msg["From"] = from_addr
-    msg["To"] = ", ".join(to_addrs)
-    if cc_addrs:
-        msg["Cc"] = ", ".join(cc_addrs)
-        print(f"[EMAIL DEBUG] Cc header set to: {msg['Cc']}")
-
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
-
-    for path, fname in (attachment_paths or []):
-        if not path or not os.path.exists(path):
-            print(f"Skipping missing attachment: {path}")
-            continue
-
-        with open(path, "rb") as fh:
-            part = MIMEBase("application", "vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-            part.set_payload(fh.read())
-        encoders.encode_base64(part)
-        part.add_header("Content-Disposition", "attachment", filename=fname)
-        msg.attach(part)
-
-    all_rcpts = list(dict.fromkeys(to_addrs + cc_addrs + bcc_addrs))
-    
-    print(f"[EMAIL DEBUG] Final recipient list for SMTP ({len(all_rcpts)} total): {all_rcpts}")
-
-    try:
-        if smtp_port == 465:
-            ctx = ssl.create_default_context()
-            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=ctx, timeout=30) as srv:
-                srv.login(smtp_user, smtp_pass)
-                srv.sendmail(from_addr, all_rcpts, msg.as_string())
-        else:
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as srv:
-                srv.ehlo()
-                srv.starttls()
-                srv.ehlo()
-                srv.login(smtp_user, smtp_pass)
-                srv.sendmail(from_addr, all_rcpts, msg.as_string())
-
-        print(f"Email sent successfully. To={to_addrs} Cc={cc_addrs} Bcc={bcc_addrs} Attachments={len(attachment_paths or [])}")
-        return True
-
-    except Exception as e:
-        print(f"Email send failed: {e}")
-        raise
 
 
 # COMMAND ----------
 
-total_tables = len(all_dg_dfs)
-total_columns_all = sum(m['total_columns'] for m in table_metrics)
-total_pii_columns_all = sum(m['pii_columns'] for m in table_metrics)
-total_descriptions = sum(m['descriptions_created'] for m in table_metrics)
+# DBTITLE 1,Return the DG Excel path to the website (matrix + email removed)
+# The AI-Metrics workbook and all email/SMTP code have been removed; instead we
+# copy the DG Excel to the output Volume and return its path (+ summary) so the
+# website can show the details and stream the file via the Files API.
+import shutil as _shutil, json as _json
 
-if len(all_dg_dfs) == 1:
-    item = all_dg_dfs[0]
-    subject = f"[DG Document] {item['catalog']}.{item['schema']}.{item['table']}"
-else:
-    subject = f"[DG Document] {len(all_dg_dfs)} Tables - {CATALOG}"
+# Output Volume the DG Excel is written to. Must match DG_OUTPUT_VOLUME on the website.
+OUTPUT_VOLUME = "/Volumes/edl_qa/qa_agent/control_m"
+_out_path = f"{OUTPUT_VOLUME.rstrip('/')}/{dg_file_name}"
+try:
+    _shutil.copy2(local_dg_xlsx, _out_path)
+    print(f"[OK] DG workbook copied to volume: {_out_path}")
+except Exception as _e:
+    _out_path = local_dg_xlsx
+    print(f"[WARN] Could not copy to volume ({_e}); returning local path.")
 
-
-table_cards_html = ""
-for idx, metric in enumerate(table_metrics):
-    pii_percentage = (metric['pii_columns'] / metric['total_columns'] * 100) if metric['total_columns'] > 0 else 0
-
-    if pii_percentage > 50:
-        border_color = "#dc3545"
-    elif pii_percentage > 20:
-        border_color = "#ffc107"
-    else:
-        border_color = "#28a745"
-
-    table_cards_html += f"""
-<div style="border: 2px solid {border_color}; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: white;">
-
-  <div style="font-weight: bold; font-size: 16px; color: #1e3a8a; margin-bottom: 12px;
-              border-bottom: 2px solid {border_color}; padding-bottom: 8px;">
-      📊 {metric['table_name']}
-  </div>
-
-  <table width="100%" cellpadding="6" cellspacing="0" border="0" style="border-collapse: collapse;">
-    <tr>
-      <td width="50%" align="center" style="background:#f8f9fa; padding:12px; border-radius:6px;">
-        <div style="font-size:22px; font-weight:bold; color:#1e3a8a;">{metric['total_columns']}</div>
-        <div style="font-size:11px; color:#6c757d; margin-top:4px;">Total Columns</div>
-      </td>
-      <td width="50%" align="center" style="background:#fff3cd; padding:12px; border-radius:6px;">
-        <div style="font-size:22px; font-weight:bold; color:#856404;">{metric['pii_columns']}</div>
-        <div style="font-size:11px; color:#856404; margin-top:4px;">PII Columns Identified</div>
-      </td>
-    </tr>
-    <tr>
-      <td width="50%" align="center" style="background:#d1ecf1; padding:12px; border-radius:6px;">
-        <div style="font-size:22px; font-weight:bold; color:#0c5460;">{metric['descriptions_created']}</div>
-        <div style="font-size:11px; color:#0c5460; margin-top:4px;">Column Descriptions</div>
-      </td>
-      <td width="50%" align="center" style="background:#e2e3e5; padding:12px; border-radius:6px;">
-        <div style="font-size:22px; font-weight:bold; color:#383d41;">{metric['duration_seconds']:.1f}s</div>
-        <div style="font-size:11px; color:#383d41; margin-top:4px;">Processing Time</div>
-      </td>
-    </tr>
-  </table>
-
-</div>
-"""
-
-minutes = int(total_pipeline_duration // 60)
-seconds = int(total_pipeline_duration % 60)
-duration_display = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
-
-
-
-# ── AI Metrics: build run-level confidence summary from table_metrics ──
-_all_overall   = [m["ai_scores"]["mean_overall_logit"] for m in table_metrics if "ai_scores" in m and m["ai_scores"]]
-_all_desc      = [m["ai_scores"]["mean_desc_logit"]    for m in table_metrics if "ai_scores" in m and m["ai_scores"]]
-_all_pii       = [m["ai_scores"]["mean_pii_logit"]     for m in table_metrics if "ai_scores" in m and m["ai_scores"]]
-
-run_mean_overall = sum(_all_overall) / len(_all_overall) if _all_overall else 0.0
-run_mean_desc    = sum(_all_desc)    / len(_all_desc)    if _all_desc    else 0.0
-run_mean_pii     = sum(_all_pii)     / len(_all_pii)     if _all_pii     else 0.0
-
-run_conf_label   = _logit_label(run_mean_overall)
-run_conf_disp = f"{logit_to_percentage(run_mean_overall)}%"
-run_desc_disp = f"{logit_to_percentage(run_mean_desc)}%"
-run_pii_disp  = f"{logit_to_percentage(run_mean_pii)}%"
-
-# colour for overall run confidence tile
-_conf_tile_colour = {
-    "High":     "#22c55e",
-    "Medium":   "#f59e0b",
-    "Low":      "#ef4444",
-    "Very Low": "#991b1b",
-}.get(run_conf_label, "#6b7280")
-
-_table_conf_tiles_html = ""
-for _m in table_metrics:
-    if "ai_scores" not in _m or not _m["ai_scores"]:
-        continue
-    _sc   = _m["ai_scores"]
-    _desc_lbl = _logit_label(_sc["mean_desc_logit"])
-    _pii_lbl  = _logit_label(_sc["mean_pii_logit"]) if _sc["mean_pii_logit"] != 0.0 else "N/A"
-    _desc_tile_bg = {
-        "High":     "#1d4ed8",
-        "Medium":   "#92400e",
-        "Low":      "#991b1b",
-        "Very Low": "#4b0000",
-    }.get(_desc_lbl, "#374151")
-    _pii_tile_bg = {
-        "High":     "#065f46",
-        "Medium":   "#78350f",
-        "Low":      "#7f1d1d",
-        "Very Low": "#3b0764",
-        "N/A":      "#374151",
-    }.get(_pii_lbl, "#374151")
-
-    _pii_disp = f"{_sc['mean_pii_logit']:.4f}" if _sc['mean_pii_logit'] != 0.0 else "N/A (no PII cols)"
-
-    _table_conf_tiles_html += f"""
-        <td valign="top" style="padding-right:10px; padding-bottom:8px;">
-            <div style="border:2px solid #e5e7eb; border-radius:8px; overflow:hidden;
-                        box-shadow:0 2px 4px rgba(0,0,0,0.10);">
-
-                <!-- Table name header -->
-                <div style="background:#1e3a8a; color:#fff; padding:8px 10px;
-                            font-size:11px; font-weight:bold; text-align:center;">
-                    {_m['table_name']}
-                </div>
-
-                <!-- Desc Score tile -->
-                <div style="background:{_desc_tile_bg}; color:#fff; padding:10px;
-                            text-align:center; border-bottom:1px solid rgba(255,255,255,0.2);">
-                    <div style="font-size:9px; opacity:0.85; margin-bottom:3px;">DESC SCORE</div>
-                    <div style="font-size:20px; font-weight:bold;">{logit_to_percentage(_sc['mean_desc_logit'])}%</div>
-                    <div style="font-size:9px; margin-top:3px; opacity:0.9;">{_desc_lbl}</div>
-                </div>
-
-                <!-- PII Score tile -->
-                <div style="background:{_pii_tile_bg}; color:#fff; padding:10px; text-align:center;">
-                    <div style="font-size:9px; opacity:0.85; margin-bottom:3px;">PII SCORE</div>
-                    <div style="font-size:20px; font-weight:bold;">{f"{logit_to_percentage(_sc['mean_pii_logit'])}%" if _sc['mean_pii_logit'] != 0.0 else "N/A"}</div>
-                    <div style="font-size:9px; margin-top:3px; opacity:0.9;">{_pii_lbl}</div>
-                </div>
-
-                <!-- Footer stats -->
-                <div style="background:#f3f4f6; color:#374151; padding:6px 10px;
-                            font-size:9px; text-align:center;">
-                    {_sc['total_cols']} cols &nbsp;|&nbsp; {_sc['high_count']} high / {_sc['low_count']} low
-                </div>
-            </div>
-        </td>"""
-
-
-html_body = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DG Document Generation Report</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9;">
-    <div style="max-width: 800px; margin: 0 auto; background-color: white;">
-
-        <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; padding: 24px; text-align: center;">
-            <h1 style="margin: 0; font-size: 28px; font-weight: 600;">&#128221; Data Governance Document</h1>
-            <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.9;">Automated DG Documentation Report</p>
-        </div>
-
-        <div style="padding: 24px;">
-
-            <p style="font-size: 15px; color: #333; margin: 0 0 20px 0;">Hi Team,</p>
-            <p style="font-size: 14px; color: #555; margin: 0 0 24px 0;">
-                The Data Governance document generation has been completed successfully.
-                Please find the two attached Excel workbooks: <b>DG Details</b> (column-level documentation) and <b>AI Metrics</b> (confidence scoring per table).
-            </p>
-
-            <div style="background: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 24px;">
-                <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #1e3a8a; border-bottom: 2px solid #3b82f6; padding-bottom: 8px;">
-                    &#128202; Summary Metrics
-                </h2>
-
-                <!-- Row 1: Run overview tiles (unchanged) -->
-                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; table-layout:fixed;">
-                    <tr>
-                        <td width="25%" valign="top" style="padding-right:12px;">
-                            <div style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-                                        color:#ffffff; padding:16px; border-radius:8px; text-align:center;
-                                        box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                                <div style="font-size:32px; font-weight:bold; line-height:1.1;">{duration_display}</div>
-                                <div style="font-size:12px; margin-top:6px; opacity:0.95;">Total Execution Time</div>
-                            </div>
-                        </td>
-
-                        <td width="25%" valign="top" style="padding-right:12px;">
-                            <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-                                        color:#ffffff; padding:16px; border-radius:8px; text-align:center;
-                                        box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                                <div style="font-size:32px; font-weight:bold; line-height:1.1;">{(total_pipeline_duration/total_tables):.1f}s</div>
-                                <div style="font-size:12px; margin-top:6px; opacity:0.95;">Average Time per Table</div>
-                            </div>
-                        </td>
-
-                        <td width="25%" valign="top" style="padding-right:12px;">
-                            <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                                        color:#ffffff; padding:16px; border-radius:8px; text-align:center;
-                                        box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                                <div style="font-size:32px; font-weight:bold; line-height:1.1;">{total_tables}</div>
-                                <div style="font-size:12px; margin-top:6px; opacity:0.95;">Total Tables</div>
-                            </div>
-                        </td>
-
-                        <td width="25%" valign="top" style="padding-right:0;">
-                            <div style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-                                        color:#ffffff; padding:16px; border-radius:8px; text-align:center;
-                                        box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                                <div style="font-size:32px; font-weight:bold; line-height:1.1;">{total_columns_all}</div>
-                                <div style="font-size:12px; margin-top:6px; opacity:0.95;">Total Columns</div>
-                            </div>
-                        </td>
-                    </tr>
-                </table>
-
-            <!-- Table-wise Results -->
-            <div style="margin-bottom: 24px; margin-top: 24px;">
-                <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #1e3a8a; border-bottom: 2px solid #3b82f6; padding-bottom: 8px;">
-                    &#128200; Table-wise Export Results
-                </h2>
-                {table_cards_html}
-            </div>
-
-            <!-- Footer -->
-            <div style="border-top: 2px solid #e5e7eb; padding-top: 16px; margin-top: 24px;">
-                <p style="font-size: 14px; color: #555; margin: 0 0 8px 0;">
-                    Best regards,<br/>
-                    <strong style="color: #1e3a8a;">DG Automation Team</strong>
-                </p>
-                <p style="font-size: 12px; color: #9ca3af; margin: 0;">
-                    Generated on {datetime.now().strftime("%B %d, %Y at %I:%M %p")}
-                </p>
-            </div>
-
-        </div>
-    </div>
-</body>
-</html>
-"""
-
-attachments = [
-    (local_dg_xlsx, dg_file_name),
-    (local_ai_xlsx, ai_file_name),
-]
-
-print("\n[EMAIL DEBUG] Recipient Details:")
-print(f"  FROM: {EMAIL_FROM}")
-print(f"  TO: {EMAIL_TO}")
-print(f"  CC: {EMAIL_CC}")
-print(f"  BCC: {EMAIL_BCC}")
-
-send_email_framework_style(
-    smtp_host=SMTP_HOST,
-    smtp_port=SMTP_PORT,
-    smtp_user=SMTP_USER,
-    smtp_pass=SMTP_PASS,
-    from_addr=EMAIL_FROM,
-    to_addrs=EMAIL_TO,
-    cc_addrs=EMAIL_CC,
-    bcc_addrs=EMAIL_BCC,
-    subject=subject,
-    html_body=html_body,
-    attachment_paths=attachments
-)
-
-# COMMAND ----------
-
-# MAGIC %skip
-# MAGIC    <!-- Row 2: AI Confidence Score Dashboard -->
-# MAGIC                 <div style="margin-top:20px;">
-# MAGIC                     <h3 style="margin: 0 0 10px 0; font-size: 15px; color: #1e3a8a;">
-# MAGIC                         AI Confidence Score (Logit-Based)
-# MAGIC                     </h3>
-# MAGIC                     <p style="font-size:11px; color:#6b7280; margin:0 0 10px 0;">
-# MAGIC                         Confidence Score = mean logit of Description Relevance + PII Confidence per table.
-# MAGIC                         Positive = AI aligned with table context. See AI_Metrics_* sheets in the Excel workbook for full breakdown.
-# MAGIC                     </p>
-# MAGIC
-# MAGIC                     <!-- Per-table confidence tiles -->
-# MAGIC                     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; table-layout:auto;">
-# MAGIC                         <tr>
-# MAGIC                             {_table_conf_tiles_html}
-# MAGIC                         </tr>
-# MAGIC                     </table>
-# MAGIC                 </div>
-# MAGIC             </div>
+_result = {
+    "output_path": _out_path,
+    "catalog": CATALOG,
+    "tables": len(all_dg_dfs),
+    "columns": sum(m.get("total_columns", 0) for m in table_metrics),
+    "pii_columns": sum(m.get("pii_columns", 0) for m in table_metrics),
+    "descriptions_created": sum(m.get("descriptions_created", 0) for m in table_metrics),
+}
+print(f"[DONE] {_result}")
+try:
+    dbutils.notebook.exit(_json.dumps(_result, default=str))
+except Exception as _e:
+    print(f"[Exit] notebook.exit skipped: {_e}")
