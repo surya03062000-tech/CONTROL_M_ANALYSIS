@@ -10,7 +10,7 @@ import { useToast } from "../components/Toast";
 import LeaveCalendar, { CalCell } from "./LeaveCalendar";
 import { ConfirmDialog } from "./Modal";
 import {
-  LEAVE_TYPES, DAY_PARTS, dayPartLabel, isHalf, genRequestId, expandDates, workingDates, computeWorkingDays, rangeLabel,
+  LEAVE_TYPES, DAY_PARTS, dayPartLabel, isHalf, genRequestId, expandDates, workingDates, computeWorkingDays, rangeLabel, typeClass,
 } from "@/lib/leaveShared";
 
 interface Session { username: string; role: string; name: string; must_change?: boolean; }
@@ -249,7 +249,7 @@ function EmployeeView({ session, onChange, toast }: { session: Session; onChange
                     {reqs.map((r) => (
                       <tr key={r.request_id}>
                         <td className="mono">{r.request_id}</td>
-                        <td><span className={`tpill t-${r.leave_type.toLowerCase()}`}>{r.leave_type}</span></td>
+                        <td><span className={`tpill ${typeClass(r.leave_type)}`}>{r.leave_type}</span></td>
                         <td>{rangeLabel(r.start_date, r.end_date)}</td>
                         <td>{dayPartLabel(r.day_part)}{!isHalf(r.day_part) && ` · ${r.days}d`}</td>
                         <td>{r.reason}</td>

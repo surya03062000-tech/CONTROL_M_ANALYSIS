@@ -18,6 +18,8 @@ const WORK: Tool[] = [
     desc: "Sign in to record your leave on a calendar; admins manage employees, view a monthly dashboard, and configure email alerts." },
   { href: "/dg", title: "DG Document Creation", icon: FileText, color: "#7c3aed",
     desc: "Create tables from a spreadsheet, then generate Data Governance documents for them and download the Excel." },
+  { href: "/stm", title: "STM Generator", icon: FileSpreadsheet, color: "#0891b2",
+    desc: "Source-to-Target Mapping generators — Oracle→EDL live; SFTP & Derived coming soon." },
 ];
 
 const FUN: Tool[] = [
@@ -28,8 +30,6 @@ const FUN: Tool[] = [
 const SOON: Tool[] = [
   { href: "#", title: "Drift Analysis", icon: GitCompareArrows, color: "#0891b2", soon: true,
     desc: "Compare lineage and container definitions across runs to surface what changed over time." },
-  { href: "#", title: "STM Generator", icon: FileSpreadsheet, color: "#0891b2", soon: true,
-    desc: "Generate Source-to-Target Mappings for ingestion and derived tables." },
   { href: "#", title: "HLD Docs", icon: FileText, color: "#0891b2", soon: true,
     desc: "Auto-create High-Level Design documents." },
   { href: "#", title: "Access Requests", icon: KeyRound, color: "#0891b2", soon: true,

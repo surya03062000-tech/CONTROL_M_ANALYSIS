@@ -19,9 +19,9 @@ const NAV: NavItem[] = [
   { href: "/history-load", label: "History Load (Prod)", icon: Database },
   { href: "/leave", label: "Leave Tracker", icon: CalendarDays },
   { href: "/dg", label: "DG Document Creation", icon: FileText },
+  { href: "/stm", label: "STM Generator", icon: FileSpreadsheet },
   { href: "https://uno-game-jsys.onrender.com/", label: "Fun Zone — UNO", icon: Gamepad2, external: true },
   { href: "#", label: "Drift Analysis", icon: GitCompareArrows, soon: true },
-  { href: "#", label: "STM Generator", icon: FileSpreadsheet, soon: true },
   { href: "#", label: "HLD Docs", icon: FileText, soon: true },
   { href: "#", label: "Access Requests", icon: KeyRound, soon: true },
 ];
