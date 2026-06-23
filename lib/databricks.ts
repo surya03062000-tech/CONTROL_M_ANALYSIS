@@ -67,6 +67,18 @@ export async function runNow(notebook_params: NotebookParams): Promise<{ run_id:
   return res.json();
 }
 
+// Trigger an arbitrary job by id (used by the DG tool, which has its own jobs).
+export async function runJob(jobId: string | number, notebook_params: NotebookParams): Promise<{ run_id: number }> {
+  if (!HOST || !TOKEN) throw new Error("Missing DATABRICKS_HOST / DATABRICKS_TOKEN.");
+  if (!jobId) throw new Error("Job ID is not configured.");
+  const res = await dbx("/api/2.1/jobs/run-now", {
+    method: "POST",
+    body: JSON.stringify({ job_id: Number(jobId), notebook_params }),
+  });
+  if (!res.ok) throw new Error(`run-now failed (${res.status}): ${await res.text()}`);
+  return res.json();
+}
+
 export interface RunState {
   life_cycle_state?: string; // PENDING | RUNNING | TERMINATING | TERMINATED | SKIPPED | INTERNAL_ERROR | BLOCKED | QUEUED
   result_state?: string; // SUCCESS | FAILED | TIMEDOUT | CANCELED
@@ -131,6 +143,23 @@ export async function listOutputs(): Promise<OutputFile[]> {
 export async function downloadFile(absPath: string): Promise<Response> {
   assertConfig();
   return dbx(`/api/2.0/fs/files${encodePath(absPath)}`, { method: "GET" });
+}
+
+// Upload a file into an arbitrary Volume folder (used by the DG tool).
+export async function uploadFileTo(volume: string, filename: string, data: Buffer | Uint8Array): Promise<{ path: string }> {
+  if (!HOST || !TOKEN) throw new Error("Missing DATABRICKS_HOST / DATABRICKS_TOKEN.");
+  const vol = (volume || "").replace(/\/+$/, "");
+  if (!vol) throw new Error("Target volume is not configured.");
+  const safeName = filename.replace(/^.*[\\/]/, "").trim();
+  if (!safeName) throw new Error("Invalid filename.");
+  const absPath = `${vol}/${safeName}`;
+  const res = await dbx(`/api/2.0/fs/files${encodePath(absPath)}?overwrite=true`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: data,
+  });
+  if (!res.ok) throw new Error(`upload failed (${res.status}): ${await res.text()}`);
+  return { path: absPath };
 }
 
 // Upload (PUT) a file straight into the input Volume via the Files API.
