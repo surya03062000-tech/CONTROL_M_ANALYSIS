@@ -5,7 +5,7 @@ import { DG_CATALOG } from "@/lib/dg";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const DG_CREATION_JOB_ID = (process.env.DG_CREATION_JOB_ID || "").trim();
+const DG_CREATION_JOB_ID = (process.env.DG_CREATION_JOB_ID || "329530658592862").trim();
 
 function gate(req: NextRequest): boolean {
   const pw = process.env.APP_PASSWORD || "";
