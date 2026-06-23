@@ -9,7 +9,7 @@ import {
 import { useToast } from "../../components/Toast";
 import LeaveCalendar, { CalCell } from "../LeaveCalendar";
 import { Modal, ConfirmDialog, PromptDialog } from "../Modal";
-import { LEAVE_TYPES, dayPartLabel, rangeLabel, typeColor, workingDates } from "@/lib/leaveShared";
+import { LEAVE_TYPES, dayPartLabel, rangeLabel, typeColor, workingDates, typeClass } from "@/lib/leaveShared";
 
 interface Session { username: string; role: string; name: string; }
 interface UserRow { username: string; role: string; display_name: string; email: string; active: string; created_at: string; must_change: string; }
@@ -270,7 +270,7 @@ function Dashboard({ toast }: { toast: (m: string, k?: any) => void }) {
                 {filtered.map((l) => (
                   <tr key={l.request_id}>
                     <td><strong>{l.display_name}</strong></td>
-                    <td><span className={`tpill t-${l.leave_type.toLowerCase()}`}>{l.leave_type}</span></td>
+                    <td><span className={`tpill ${typeClass(l.leave_type)}`}>{l.leave_type}</span></td>
                     <td>{rangeLabel(l.start_date, l.end_date)}</td>
                     <td>{dayPartLabel(l.day_part)}</td>
                     <td>{l.reason}</td>
@@ -459,7 +459,7 @@ function HistoryModal({ data, onClose }: { data: { user: string; leaves: Leave[]
           <table className="ltable">
             <thead><tr><th>Type</th><th>Date(s)</th><th>Duration</th><th>Reason</th></tr></thead>
             <tbody>{data.leaves.map((l) => (
-              <tr key={l.request_id}><td><span className={`tpill t-${l.leave_type.toLowerCase()}`}>{l.leave_type}</span></td><td>{rangeLabel(l.start_date, l.end_date)}</td><td>{dayPartLabel(l.day_part)}</td><td>{l.reason}</td></tr>
+              <tr key={l.request_id}><td><span className={`tpill ${typeClass(l.leave_type)}`}>{l.leave_type}</span></td><td>{rangeLabel(l.start_date, l.end_date)}</td><td>{dayPartLabel(l.day_part)}</td><td>{l.reason}</td></tr>
             ))}</tbody>
           </table>
         </div>

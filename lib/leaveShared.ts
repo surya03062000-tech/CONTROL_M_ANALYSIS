@@ -1,5 +1,5 @@
 // Shared, dependency-free helpers for the Leave module (safe in client + server).
-export const LEAVE_TYPES = ["Holiday", "Unplanned", "Sick", "Planned"] as const;
+export const LEAVE_TYPES = ["Unplanned", "Sick", "Planned", "Comp Off"] as const;
 export type LeaveType = typeof LEAVE_TYPES[number];
 
 export const DAY_PARTS = [
@@ -43,7 +43,11 @@ export function computeWorkingDays(start: string, end: string, dayPart: string, 
   return workingDates(start, end, holidays).length;
 }
 export function typeColor(t: string): string {
-  return ({ Holiday: "#DA291C", Unplanned: "#d97706", Sick: "#0891b2", Planned: "#16a34a" } as Record<string, string>)[t] || "#64748b";
+  return ({ Unplanned: "#d97706", Sick: "#0891b2", Planned: "#16a34a", "Comp Off": "#7c3aed", Holiday: "#DA291C" } as Record<string, string>)[t] || "#64748b";
+}
+// CSS-safe class for a leave type (e.g. "Comp Off" → "t-comp-off").
+export function typeClass(t: string): string {
+  return "t-" + String(t).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 export function rangeLabel(start: string, end: string): string {
   return start === end ? start : `${start} → ${end}`;
