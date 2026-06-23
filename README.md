@@ -164,6 +164,22 @@ add/edit/deactivate/role/reset, per-employee history), **company holidays**, not
 recipients, and an **audit log**. Login is rate-limited; new/reset users must set a password on
 next sign-in; tables auto-create and the `admin` account is seeded on first login.
 
+## DG Document Creation
+
+A 3-step tool at **`/dg`** (catalog fixed to `edl_qa`):
+
+1. **Create tables** — download the standard template (Schema · Table · Column · Data Type),
+   fill it (100+ tables OK), upload. The file is copied to `DG_INPUT_VOLUME` and the schemas/
+   tables are created in `edl_qa` via the SQL Warehouse, with **live logs** streamed to the page.
+2. **Generate DG document** — pick schema(s) + table(s) (catalog is fixed) and a business
+   description, then trigger the **DG Databricks job** (`DG_CREATION_JOB_ID`, params
+   `CATALOG/SCHEMA/TABLE_NAME/TABLE_DESCRIPTION`) and watch status + logs.
+3. **Result** — review details and **download the Excel**. (No matrix/mail — details are shown here.)
+
+Env: `DG_CREATION_JOB_ID` (required for step 2), `DG_CATALOG` (default `edl_qa`),
+`DG_INPUT_VOLUME` (defaults to `INPUT_VOLUME`), `DG_OUTPUT_VOLUME` (defaults to `OUTPUT_VOLUME`).
+Step 1 reuses the SQL Warehouse (`DATABRICKS_WAREHOUSE_ID`).
+
 ## Notes / troubleshooting
 - **401 from Databricks** → token expired or lacks job/Files permission.
 - **Upload fails (403/404)** → the token needs **write** on `INPUT_VOLUME` and the Files API

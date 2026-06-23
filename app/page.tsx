@@ -16,6 +16,8 @@ const WORK: Tool[] = [
     desc: "Open the production history-load notebooks in Rogers Databricks. Dev access required." },
   { href: "/leave", title: "Leave Tracker", icon: CalendarDays, color: "#16a34a",
     desc: "Sign in to record your leave on a calendar; admins manage employees, view a monthly dashboard, and configure email alerts." },
+  { href: "/dg", title: "DG Document Creation", icon: FileText, color: "#7c3aed",
+    desc: "Create tables from a spreadsheet, then generate Data Governance documents for them and download the Excel." },
 ];
 
 const FUN: Tool[] = [
@@ -28,8 +30,8 @@ const SOON: Tool[] = [
     desc: "Compare lineage and container definitions across runs to surface what changed over time." },
   { href: "#", title: "STM Generator", icon: FileSpreadsheet, color: "#0891b2", soon: true,
     desc: "Generate Source-to-Target Mappings for ingestion and derived tables." },
-  { href: "#", title: "DG / HLD Docs", icon: FileText, color: "#0891b2", soon: true,
-    desc: "Auto-create Data Governance and High-Level Design documents." },
+  { href: "#", title: "HLD Docs", icon: FileText, color: "#0891b2", soon: true,
+    desc: "Auto-create High-Level Design documents." },
   { href: "#", title: "Access Requests", icon: KeyRound, color: "#0891b2", soon: true,
     desc: "Shortcuts and import links for common Rogers access requests." },
 ];
