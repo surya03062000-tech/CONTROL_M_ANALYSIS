@@ -1,9 +1,9 @@
-import Link from "next/link";
 import {
   Workflow, Database, GitCompareArrows, FileSpreadsheet, FileText, Share2,
   CalendarDays, KeyRound, Gamepad2, ArrowRight, ExternalLink, Clock,
 } from "lucide-react";
 import Hero from "./components/Hero";
+import TiltCard from "./components/TiltCard";
 
 interface Tool {
   href: string; title: string; desc: string; icon: any; color: string; soon?: boolean; external?: boolean;
@@ -54,9 +54,9 @@ function Card({ t }: { t: Tool }) {
     </>
   );
   const style = { ["--tool" as any]: t.color };
-  if (t.soon) return <div className="tool-card disabled" style={style}>{inner}</div>;
-  if (t.external) return <a className="tool-card" style={style} href={t.href} target="_blank" rel="noreferrer">{inner}</a>;
-  return <Link className="tool-card" style={style} href={t.href}>{inner}</Link>;
+  if (t.soon) return <TiltCard as="div" className="tool-card disabled" style={style}>{inner}</TiltCard>;
+  if (t.external) return <TiltCard as="a" className="tool-card" style={style} href={t.href} target="_blank" rel="noreferrer">{inner}</TiltCard>;
+  return <TiltCard as="link" className="tool-card" style={style} href={t.href}>{inner}</TiltCard>;
 }
 
 export default function Dashboard() {
