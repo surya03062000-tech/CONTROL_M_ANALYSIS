@@ -165,13 +165,32 @@ html[data-theme="dark"] .ops { color: #cdd7ea; }
 @media (max-width: 760px) { .tool-grid { grid-template-columns: 1fr; } }
 .tool-card {
   --tool: var(--accent);
-  display: flex; align-items: flex-start; gap: 14px; padding: 20px; text-decoration: none;
+  display: block; text-decoration: none; position: relative; overflow: hidden;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
   box-shadow: var(--shadow-sm); color: var(--text); transition: transform .12s ease, box-shadow .18s ease, border-color .18s ease;
 }
 .tool-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hover); border-color: var(--tool); }
 .tool-card.disabled { cursor: default; border-style: dashed; background: var(--surface-2); }
 .tool-card.disabled:hover { transform: none; box-shadow: var(--shadow-sm); border-color: var(--line-2); }
+
+/* 3D tilt: outer card holds shadow/hover-lift, inner div carries the mouse-follow
+   perspective rotation so the two transforms don't fight each other. */
+.tilt-card { perspective: 900px; }
+.tilt-card-inner {
+  display: flex; align-items: flex-start; gap: 14px; padding: 20px;
+  transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transition: transform .15s ease-out;
+  transform-style: preserve-3d; position: relative; z-index: 1;
+}
+.tilt-card::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .2s ease;
+  background: radial-gradient(220px circle at var(--glow-x, 50%) var(--glow-y, 50%), color-mix(in srgb, var(--tool) 16%, transparent), transparent 70%);
+}
+.tool-card:hover::before { opacity: 1; }
+@media (prefers-reduced-motion: reduce), (hover: none) {
+  .tilt-card-inner { transform: none !important; }
+  .tilt-card::before { display: none; }
+}
 .tool-ico {
   width: 46px; height: 46px; flex: 0 0 auto; border-radius: 12px; display: grid; place-items: center; color: #fff;
   background: linear-gradient(135deg, var(--tool), color-mix(in srgb, var(--tool) 65%, #000));
@@ -379,7 +398,18 @@ input.err { border-color: var(--err); }
 .hero::after {
   content: ""; position: absolute; right: -40px; top: -60px; width: 320px; height: 320px;
   background-image: url("/icon.svg"); background-size: contain; background-repeat: no-repeat;
-  opacity: .12; filter: brightness(0) invert(1); transform: rotate(8deg); pointer-events: none;
+  opacity: .12; filter: brightness(0) invert(1); pointer-events: none;
+  transform: rotate(8deg) translate3d(var(--px, 0px), var(--py, 0px), 0);
+  transition: transform .2s ease-out;
+}
+.hero-content {
+  position: relative; z-index: 1;
+  transform: translate3d(var(--cx, 0px), var(--cy, 0px), 0);
+  transition: transform .2s ease-out;
+}
+@media (prefers-reduced-motion: reduce), (hover: none) {
+  .hero::after { transform: rotate(8deg) !important; }
+  .hero-content { transform: none !important; }
 }
 .hero-greeting { font-size: 14px; font-weight: 600; opacity: .9; }
 .hero h1 { font-size: 30px; font-weight: 900; letter-spacing: -.5px; margin: 6px 0 6px; color: #fff; -webkit-text-fill-color: #fff; display: flex; align-items: center; gap: 10px; }
