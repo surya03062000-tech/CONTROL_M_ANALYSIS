@@ -12,8 +12,9 @@ function gate(req: NextRequest): boolean {
   return !pw || req.headers.get("x-app-password") === pw;
 }
 
-// preview=1 → parse + quality report only (#18 dry run). Otherwise: store in the
-// Volume and persist the parsed edges to Delta (#19).
+// mode=preview → parse + quality report only (#18 dry run)
+// mode=upload  → save the workbook to the Volume
+// mode=store   → index the parsed edges into the Delta table (#19)
 export async function POST(req: NextRequest) {
   try {
     if (!gate(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -22,7 +23,9 @@ export async function POST(req: NextRequest) {
     if (!file || typeof file === "string") return NextResponse.json({ error: "No file provided." }, { status: 400 });
     const f = file as File;
     if (!/\.(xlsx|xls)$/i.test(f.name)) return NextResponse.json({ error: "Please upload an .xlsx file." }, { status: 400 });
-    const preview = form.get("preview") === "1";
+
+    const legacyPreview = form.get("preview") === "1";
+    const mode = legacyPreview ? "preview" : String(form.get("mode") || "upload");
 
     const buf = Buffer.from(await f.arrayBuffer());
     const { rows, quality, sheet } = await parseLineage(buf);
@@ -35,24 +38,23 @@ export async function POST(req: NextRequest) {
 
     const targets = new Set(rows.map((r) => `${r.tdb}.${r.tsc}.${r.ttb}`)).size;
     const apps = [...new Set(rows.map((r) => r.app).filter(Boolean))];
-    if (preview) return NextResponse.json({ preview: true, name: f.name, sheet, quality, targets, apps });
+    const base = { name: f.name, sheet, size: buf.length, quality, targets, apps };
 
+    if (mode === "preview") return NextResponse.json({ ...base, mode, preview: true });
+
+    if (mode === "store") {
+      // Index the parsed edges into Delta so traces query the lakehouse.
+      const dataset = f.name.replace(/\.(xlsx|xls)$/i, "");
+      await saveToDelta(dataset, rows);
+      invalidate(`delta:${dataset}`);
+      return NextResponse.json({ ...base, mode, dataset, stored: rows.length });
+    }
+
+    // mode === "upload": Volume copy only.
     if (!LINEAGE_VOLUME) return NextResponse.json({ error: "LINEAGE_VOLUME (or INPUT_VOLUME) is not configured." }, { status: 500 });
     const { path } = await uploadFileTo(LINEAGE_VOLUME, f.name, buf);
     invalidate(path);
-
-    // Persist to Delta so traces don't re-read the workbook (best effort).
-    let dataset = ""; let deltaError = "";
-    try {
-      dataset = f.name.replace(/\.(xlsx|xls)$/i, "");
-      await saveToDelta(dataset, rows);
-      invalidate(`delta:${dataset}`);
-    } catch (e: any) { deltaError = e?.message || String(e); dataset = ""; }
-
-    return NextResponse.json({
-      path, name: f.name, sheet, size: buf.length, quality, targets, apps,
-      dataset, deltaError: deltaError || undefined,
-    });
+    return NextResponse.json({ ...base, mode, path });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
   }
