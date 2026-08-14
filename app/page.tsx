@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  Workflow, Database, GitCompareArrows, FileSpreadsheet, FileText,
+  Workflow, Database, GitCompareArrows, FileSpreadsheet, FileText, Share2,
   CalendarDays, KeyRound, Gamepad2, ArrowRight, ExternalLink, Clock,
 } from "lucide-react";
 import Hero from "./components/Hero";
@@ -20,6 +20,8 @@ const WORK: Tool[] = [
     desc: "Create tables from a spreadsheet, then generate Data Governance documents for them and download the Excel." },
   { href: "/stm", title: "STM Generator", icon: FileSpreadsheet, color: "#0891b2",
     desc: "Source-to-Target Mapping generators — Oracle→EDL live; SFTP & Derived coming soon." },
+  { href: "/lineage", title: "Data Lineage", icon: Share2, color: "#0f766e",
+    desc: "Upload the lineage workbook, then trace any target table back through its sources and download the diagram." },
 ];
 
 const FUN: Tool[] = [
