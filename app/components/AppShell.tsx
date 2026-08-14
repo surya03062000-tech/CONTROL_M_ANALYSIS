@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Workflow, Database, GitCompareArrows, FileSpreadsheet, FileText,
+  LayoutDashboard, Workflow, Database, GitCompareArrows, FileSpreadsheet, FileText, Share2,
   CalendarDays, KeyRound, Gamepad2, Menu, X, ExternalLink,
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
@@ -20,6 +20,7 @@ const NAV: NavItem[] = [
   { href: "/leave", label: "Leave Tracker", icon: CalendarDays },
   { href: "/dg", label: "DG Document Creation", icon: FileText },
   { href: "/stm", label: "STM Generator", icon: FileSpreadsheet },
+  { href: "/lineage", label: "Data Lineage", icon: Share2 },
   { href: "https://uno-game-jsys.onrender.com/", label: "Fun Zone — UNO", icon: Gamepad2, external: true },
   { href: "#", label: "Drift Analysis", icon: GitCompareArrows, soon: true },
   { href: "#", label: "HLD Docs", icon: FileText, soon: true },
