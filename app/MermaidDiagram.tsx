@@ -23,7 +23,13 @@ function rogersTheme(code: string): string {
     .replace(/classDef chainJob[^\n;]*/g, "classDef chainJob fill:#FCE9E7,stroke:#E3B4AF,color:#3a3a3a");
 }
 
-export default function MermaidDiagram({ code, liveUrl }: { code: string; liveUrl?: string }) {
+export default function MermaidDiagram({
+  code, liveUrl, idMap, onNodeClick,
+}: {
+  code: string; liveUrl?: string;
+  idMap?: Record<string, string>;              // mermaid node id -> real id
+  onNodeClick?: (id: string) => void;          // #6 click a node to drill in
+}) {
   const hostRef = useRef<HTMLDivElement>(null);
   const twRef = useRef<any>(null);
   const [err, setErr] = useState("");
@@ -68,6 +74,25 @@ export default function MermaidDiagram({ code, liveUrl }: { code: string; liveUr
     })();
     return () => { cancelled = true; };
   }, [code, theme]);
+
+  // make nodes clickable (drill into a table's lineage)
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host || !ready || !onNodeClick || !idMap) return;
+    const nodes = Array.from(host.querySelectorAll("g.node")) as SVGGElement[];
+    const cleanups: (() => void)[] = [];
+    for (const el of nodes) {
+      // mermaid ids look like "flowchart-<nodeId>-<n>"
+      const raw = el.id || "";
+      const key = Object.keys(idMap).find((k) => raw.includes(k));
+      if (!key) continue;
+      const handler = (ev: Event) => { ev.stopPropagation(); onNodeClick(idMap[key]); };
+      el.style.cursor = "pointer";
+      el.addEventListener("click", handler);
+      cleanups.push(() => el.removeEventListener("click", handler));
+    }
+    return () => cleanups.forEach((c) => c());
+  }, [ready, idMap, onNodeClick]);
 
   // highlight nodes matching the search query
   useEffect(() => {

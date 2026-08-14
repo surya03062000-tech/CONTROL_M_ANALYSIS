@@ -21,10 +21,16 @@ export async function GET(req: NextRequest) {
     const direction = (sp.get("direction") || "upstream") as "upstream" | "downstream" | "both";
 
     const g = await loadGraph(path);
-    const matches = resolveTable(g, table);
-    if (!matches.length) return NextResponse.json({ error: "No matching table" }, { status: 404 });
-    const seed = matches[0];
-    const t = trace(g, seed, direction, 0);
+    const depth = Math.max(0, Math.min(20, Number(sp.get("depth") || 0)));
+    const apps = (sp.get("apps") || "").split(",").map((s) => s.trim()).filter(Boolean);
+    const seeds: string[] = [];
+    for (const w of table.split(",").map((s) => s.trim()).filter(Boolean)) {
+      const m = resolveTable(g, w);
+      if (m.length) seeds.push(m[0]);
+    }
+    if (!seeds.length) return NextResponse.json({ error: "No matching table" }, { status: 404 });
+    const seed = seeds[0];
+    const t = trace(g, seeds, { direction, maxDepth: depth, apps });
 
     const wb = new ExcelJS.Workbook();
     wb.creator = "OpsCentral — Data Lineage";

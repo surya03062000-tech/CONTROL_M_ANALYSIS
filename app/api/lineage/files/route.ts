@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
-import { listLineageFiles } from "@/lib/lineageStore";
+import { listLineageFiles, listDatasets } from "@/lib/lineageStore";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Lineage workbooks available in the Volume (newest first).
+// Available lineage sources: Delta datasets (#19) + workbooks in the Volume.
 export async function GET() {
   try {
-    const files = (await listLineageFiles()).slice(0, 10);
-    return NextResponse.json({ files });
+    const [files, datasets] = await Promise.all([
+      listLineageFiles().catch(() => []),
+      listDatasets().catch(() => []),
+    ]);
+    return NextResponse.json({ files: files.slice(0, 10), datasets });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
   }
