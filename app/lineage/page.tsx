@@ -44,6 +44,7 @@ export default function LineagePage() {
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
   const [previewing, setPreviewing] = useState(false);
+  const [storing, setStoring] = useState(false);
   const [quality, setQuality] = useState<Quality | null>(null);
   const [qualityFor, setQualityFor] = useState("");
   const [showIssues, setShowIssues] = useState(false);
@@ -107,33 +108,39 @@ export default function LineagePage() {
     } catch (e: any) { toast(e?.message || "Failed", "error"); setTables([]); setMeta(null); }
   }
 
-  function sendFile(preview: boolean) {
+  function sendFile(mode: "preview" | "upload" | "store") {
     if (!file) return;
-    preview ? setPreviewing(true) : setUploading(true);
-    setUploadPct(0);
-    const fd = new FormData(); fd.append("file", file);
-    if (preview) fd.append("preview", "1");
+    if (mode === "preview") setPreviewing(true);
+    else if (mode === "store") setStoring(true);
+    else { setUploading(true); setUploadPct(0); }
+    const fd = new FormData(); fd.append("file", file); fd.append("mode", mode);
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/lineage/upload");
     if (password) xhr.setRequestHeader("x-app-password", password);
-    xhr.upload.onprogress = (e) => { if (e.lengthComputable && !preview) setUploadPct(Math.round((e.loaded / e.total) * 100)); };
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable && mode === "upload") setUploadPct(Math.round((e.loaded / e.total) * 100)); };
     xhr.onload = () => {
-      setPreviewing(false); setUploading(false);
+      setPreviewing(false); setUploading(false); setStoring(false);
       try {
         const d = JSON.parse(xhr.responseText);
         if (xhr.status >= 200 && xhr.status < 300) {
           setQuality(d.quality); setQualityFor(d.name || file.name);
-          if (preview) toast(`Preview — ${d.quality.validEdges} edge(s), ${d.quality.skipped} skipped`, "info");
-          else {
-            toast(`Stored — ${d.quality.validEdges} edge(s)${d.dataset ? " (Delta)" : ""}`, "success");
+          if (mode === "preview") toast(`Preview — ${d.quality.validEdges} edge(s), ${d.quality.skipped} skipped`, "info");
+          else if (mode === "store") {
+            toast(`Indexed ${d.stored} edge(s) into Delta`, "success");
+            loadSources().then(() => setRef(`delta:${d.dataset}`));
+          } else {
+            toast(`Uploaded to Volume — ${d.quality.validEdges} edge(s)`, "success");
             setUploadPct(100);
-            loadSources().then(() => setRef(d.dataset ? `delta:${d.dataset}` : d.path));
-            if (d.deltaError) toast(`Volume saved; Delta store skipped: ${d.deltaError}`, "error");
+            loadSources().then(() => setRef(d.path));
           }
-        } else { toast(d.error || "Upload failed", "error"); if (d.quality) { setQuality(d.quality); setQualityFor(file.name); } setUploadPct(0); }
-      } catch { toast("Upload failed", "error"); setUploadPct(0); }
+        } else {
+          toast(d.error || (mode === "store" ? "Store failed" : "Upload failed"), "error");
+          if (d.quality) { setQuality(d.quality); setQualityFor(file.name); }
+          if (mode === "upload") setUploadPct(0);
+        }
+      } catch { toast("Request failed", "error"); setUploadPct(0); }
     };
-    xhr.onerror = () => { setPreviewing(false); setUploading(false); setUploadPct(0); toast("Network error", "error"); };
+    xhr.onerror = () => { setPreviewing(false); setUploading(false); setStoring(false); setUploadPct(0); toast("Network error", "error"); };
     xhr.send(fd);
   }
 
@@ -208,13 +215,19 @@ export default function LineagePage() {
         {(uploading || uploadPct > 0) && <div className="progress" style={{ marginTop: 12 }}><div className="progress-bar" style={{ width: `${uploadPct}%` }} /></div>}
 
         <div className="row" style={{ marginTop: 14 }}>
-          <button className="btn ghost" onClick={() => sendFile(true)} disabled={!file || previewing || uploading}>
+          <button className="btn ghost" onClick={() => sendFile("preview")} disabled={!file || previewing || uploading || storing}>
             {previewing ? <><Loader2 size={16} className="spin" /> Checking…</> : <><Eye size={16} /> Preview &amp; check</>}
           </button>
-          <button className="btn primary" onClick={() => sendFile(false)} disabled={!file || uploading || previewing}>
-            {uploading ? <><Loader2 size={16} className="spin" /> Uploading… {uploadPct}%</> : <><Upload size={16} /> Upload &amp; store</>}
+          <button className="btn primary" onClick={() => sendFile("upload")} disabled={!file || uploading || previewing || storing}>
+            {uploading ? <><Loader2 size={16} className="spin" /> Uploading… {uploadPct}%</> : <><Upload size={16} /> Upload to Volume</>}
+          </button>
+          <button className="btn secondary" onClick={() => sendFile("store")} disabled={!file || uploading || previewing || storing}>
+            {storing ? <><Loader2 size={16} className="spin" /> Storing…</> : <><Database size={16} /> Store to Delta</>}
           </button>
           <button className="icon-btn" onClick={loadSources} title="Refresh"><RefreshCw size={16} /></button>
+        </div>
+        <div className="muted small" style={{ marginTop: 8 }}>
+          <b>Preview</b> checks the sheet without saving · <b>Upload</b> saves the workbook to the Databricks Volume · <b>Store</b> indexes the rows into the Delta lineage table.
         </div>
 
         {quality && (

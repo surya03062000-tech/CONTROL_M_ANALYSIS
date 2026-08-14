@@ -287,7 +287,7 @@ export function toMermaid(t: Trace, opts: MermaidOpts = {}): { code: string; idM
   const decl = (n: LinNode) => {
     const sid = safeId(n.id);
     idMap[sid] = n.id;
-    const label = n.schema ? `${esc(n.table)}<br/>${esc(n.schema)}` : esc(n.table);
+    const label = n.schema ? `${esc(n.schema)}.${esc(n.table)}` : esc(n.table);
     return `    ${sid}["${label}"]`;
   };
 
