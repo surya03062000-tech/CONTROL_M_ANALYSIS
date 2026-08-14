@@ -186,7 +186,7 @@ html[data-theme="dark"] .ops { color: #cdd7ea; }
   content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .2s ease;
   background: radial-gradient(220px circle at var(--glow-x, 50%) var(--glow-y, 50%), color-mix(in srgb, var(--tool) 16%, transparent), transparent 70%);
 }
-.tool-card:hover::before { opacity: 1; }
+.tilt-card:hover::before { opacity: 1; }
 @media (prefers-reduced-motion: reduce), (hover: none) {
   .tilt-card-inner { transform: none !important; }
   .tilt-card::before { display: none; }
@@ -320,6 +320,9 @@ input.err { border-color: var(--err); }
 .stat-ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: #fff; }
 .stat-val { font-size: 26px; font-weight: 800; letter-spacing: -.5px; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
 .stat-lbl { font-size: 12px; color: var(--muted); font-weight: 600; }
+/* opt-in 3D-tilt variant (Lineage stat tiles): content moves into .tilt-card-inner */
+.stat.tilt-card { display: block; padding: 0; position: relative; overflow: hidden; }
+.stat.tilt-card > .tilt-card-inner { display: flex; flex-direction: column; gap: 10px; padding: 16px; align-items: stretch; }
 .meta { margin-top: 16px; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; }
 .meta-row { display: flex; gap: 14px; padding: 10px 16px; font-size: 13.5px; border-top: 1px solid var(--line); }
 .meta-row:first-child { border-top: 0; }

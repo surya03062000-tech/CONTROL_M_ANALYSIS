@@ -7,6 +7,7 @@ import {
   AlertTriangle, Table2, Eye, Link2, ShieldCheck, X, Zap, Database,
 } from "lucide-react";
 import { useToast } from "../components/Toast";
+import TiltCard from "../components/TiltCard";
 
 const MermaidDiagram = dynamic(() => import("../MermaidDiagram"), { ssr: false });
 
@@ -456,5 +457,11 @@ export default function LineagePage() {
 }
 
 function QTile({ n, label, c }: { n: number; label: string; c: string }) {
-  return <div className="stat"><div className="stat-ico" style={{ background: c }}><Share2 size={16} /></div><div className="stat-val">{n}</div><div className="stat-lbl">{label}</div></div>;
+  return (
+    <TiltCard as="div" className="stat" style={{ ["--tool" as any]: c }}>
+      <div className="stat-ico" style={{ background: c }}><Share2 size={16} /></div>
+      <div className="stat-val">{n}</div>
+      <div className="stat-lbl">{label}</div>
+    </TiltCard>
+  );
 }
