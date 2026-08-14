@@ -562,6 +562,12 @@ html[data-theme="dark"] .tpill.t-comp-off { background: #221a3a; color: #c4b5fd;
 .log-line.ok { color: #86efac; }
 .log-line.err { color: #fca5a5; }
 
+/* lineage legend */
+.lin-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 16px; font-size: 12px; color: var(--text-2); }
+.lin-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.lin-legend i { width: 13px; height: 13px; border-radius: 4px; display: inline-block; }
+.lin-legend i.dashed { border-top: 2px dotted var(--muted); height: 0; border-radius: 0; width: 18px; }
+
 /* pick list (DG tables) */
 .picklist { margin-top: 8px; max-height: 240px; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2); }
 .pick-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; cursor: pointer; }
