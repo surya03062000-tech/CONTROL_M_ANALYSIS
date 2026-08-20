@@ -57,6 +57,12 @@ export default function MermaidDiagram({
         mermaid.initialize({
           startOnLoad: false, securityLevel: "loose",
           theme: theme === "dark" ? "dark" : "neutral",
+          // Mermaid's own defaults (maxEdges: 500, maxTextSize: 50_000 chars)
+          // refuse to render large lineages outright — real graphs here can
+          // legitimately have 500+ relationships, so raise both well past
+          // what DEFAULT_MAX_NODES in lib/lineage.ts can produce.
+          maxEdges: 20000,
+          maxTextSize: 4_000_000,
           flowchart: { useMaxWidth: false, htmlLabels: false, curve: "basis" },
         });
         const id = "mmd-" + Math.random().toString(36).slice(2);
@@ -64,12 +70,8 @@ export default function MermaidDiagram({
         if (cancelled || !hostRef.current) return;
         hostRef.current.innerHTML = svg;
         setReady(true);
-        // fit the whole diagram into view once it's in the DOM
-        setTimeout(() => {
-          const el = hostRef.current?.querySelector("svg") as SVGSVGElement | null;
-          try { if (el && twRef.current?.zoomToElement) twRef.current.zoomToElement(el, undefined, 250); }
-          catch { try { twRef.current?.resetTransform(); } catch {} }
-        }, 60);
+        // fit the whole diagram into view once it's laid out in the DOM
+        requestAnimationFrame(() => requestAnimationFrame(() => fitToView(0)));
       } catch (e: any) { if (!cancelled) setErr(e?.message || String(e)); }
     })();
     return () => { cancelled = true; };
@@ -114,6 +116,30 @@ export default function MermaidDiagram({
   }, [full]);
 
   function svgEl(): SVGSVGElement | null { return hostRef.current?.querySelector("svg") || null; }
+
+  // Compute a "fit width/height, centered" transform ourselves rather than relying
+  // on react-zoom-pan-pinch's zoomToElement (which measures the target element at
+  // call time and, on large diagrams, can land on a scale below the wrapper's
+  // minScale — the transform then gets silently clamped without re-centering,
+  // which is what produced the "too zoomed in / off-centre" symptom on big graphs).
+  function fitToView(animationTime = 200) {
+    const svg = svgEl();
+    const wrapper = hostRef.current?.closest(".mm-wrapper") as HTMLElement | null;
+    const api = twRef.current;
+    if (!svg || !wrapper || !api?.setTransform) return;
+    const vb = svg.viewBox?.baseVal;
+    const rect = svg.getBoundingClientRect();
+    const svgW = (vb && vb.width) || rect.width;
+    const svgH = (vb && vb.height) || rect.height;
+    const wrapW = wrapper.clientWidth, wrapH = wrapper.clientHeight;
+    if (!svgW || !svgH || !wrapW || !wrapH) return;
+    const MIN_SCALE = 0.02, MAX_SCALE = 2;
+    const pad = 0.94; // small margin so nothing is flush against the edge
+    const scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Math.min(wrapW / svgW, wrapH / svgH) * pad));
+    const x = (wrapW - svgW * scale) / 2;
+    const y = (wrapH - svgH * scale) / 2;
+    api.setTransform(x, y, scale, animationTime);
+  }
 
   function downloadSvg() {
     const svg = svgEl(); if (!svg) return;
@@ -166,19 +192,19 @@ export default function MermaidDiagram({
       </div>
 
       <div className="diagram-stage">
-        <TransformWrapper ref={twRef} initialScale={1} minScale={0.1} maxScale={8} centerOnInit
+        <TransformWrapper ref={twRef} initialScale={1} minScale={0.02} maxScale={8} centerOnInit
           wheel={{ step: 0.12 }} doubleClick={{ disabled: true }}>
-          {({ zoomIn, zoomOut, resetTransform }) => (
+          {({ zoomIn, zoomOut }) => (
             <>
               <div className="zoom-bar">
                 <button className="icon-btn" onClick={() => zoomIn()} aria-label="Zoom in" title="Zoom in"><ZoomIn size={16} /></button>
                 <button className="icon-btn" onClick={() => zoomOut()} aria-label="Zoom out" title="Zoom out"><ZoomOut size={16} /></button>
-                <button className="icon-btn" onClick={() => { const el = svgEl(); el && twRef.current?.zoomToElement ? twRef.current.zoomToElement(el, undefined, 250) : resetTransform(); }} aria-label="Fit" title="Fit to screen"><Scan size={16} /></button>
+                <button className="icon-btn" onClick={() => fitToView(250)} aria-label="Fit" title="Fit to screen"><Scan size={16} /></button>
                 <span className="zoom-sep" />
                 <button className="icon-btn" onClick={downloadPng} aria-label="Download PNG" title="Download PNG"><ImageIcon size={16} /></button>
                 <button className="icon-btn" onClick={downloadSvg} aria-label="Download SVG" title="Download SVG"><FileCode2 size={16} /></button>
                 {liveUrl && <a className="icon-btn" href={liveUrl} target="_blank" rel="noreferrer" aria-label="Mermaid Live" title="Open in Mermaid Live"><ExternalLink size={16} /></a>}
-                <button className="icon-btn" onClick={() => { setFull((v) => !v); setTimeout(() => { const el = svgEl(); el && twRef.current?.zoomToElement ? twRef.current.zoomToElement(el, undefined, 200) : resetTransform(); }, 80); }}
+                <button className="icon-btn" onClick={() => { setFull((v) => !v); requestAnimationFrame(() => requestAnimationFrame(() => fitToView(200))); }}
                         aria-label="Fullscreen" title="Fullscreen">
                   {full ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                 </button>

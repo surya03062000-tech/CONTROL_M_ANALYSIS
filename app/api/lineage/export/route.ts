@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { loadGraph, allowedPath } from "@/lib/lineageStore";
-import { resolveTable, trace } from "@/lib/lineage";
+import { resolveTable, trace, schemaBreakdown, DEFAULT_MAX_NODES } from "@/lib/lineage";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -30,7 +30,8 @@ export async function GET(req: NextRequest) {
     }
     if (!seeds.length) return NextResponse.json({ error: "No matching table" }, { status: 404 });
     const seed = seeds[0];
-    const t = trace(g, seeds, { direction, maxDepth: depth, apps });
+    const t = trace(g, seeds, { direction, maxDepth: depth, apps, maxNodes: DEFAULT_MAX_NODES });
+    const schemas = schemaBreakdown(t.nodes);
 
     const wb = new ExcelJS.Workbook();
     wb.creator = "OpsCentral — Data Lineage";
@@ -74,6 +75,41 @@ export async function GET(req: NextRequest) {
       r.eachCell((c) => { c.border = borders; });
       if (i % 2 === 1) r.eachCell((c) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT } }; });
     });
+
+    // Target Table: X — how many tables come from each schema, split staging vs
+    // application (e.g. "ELA_V21: 5 tables", "APP_IFRS: 4 Stg tables / 3 App tables").
+    const sbWs = wb.addWorksheet("Schema Breakdown", { views: [{ state: "frozen", ySplit: 3 }] });
+    sbWs.mergeCells("A1:D1");
+    const sbTitle = sbWs.getCell("A1");
+    sbTitle.value = `Target Table: ${seed}`;
+    sbTitle.font = { bold: true, size: 14, color: { argb: RED } };
+    sbWs.getCell("A2").value = "Dependency table count per schema (staging vs application), excluding the target itself.";
+    sbWs.getCell("A2").font = { italic: true, size: 10, color: { argb: "FF777777" } };
+    sbWs.columns = [{ width: 26 }, { width: 14 }, { width: 13 }, { width: 80 }];
+    const sbHead = sbWs.addRow(["Schema", "Category", "Table Count", "Tables"]);
+    sbHead.eachCell((c) => {
+      c.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: RED } };
+      c.border = borders;
+    });
+    sbWs.autoFilter = { from: "A3", to: "D3" };
+
+    let sbRow = 0, totalTables = 0;
+    for (const s of schemas) {
+      totalTables += s.totalCount;
+      if (s.stgCount > 0) {
+        const r = sbWs.addRow([s.schema, "Stg tables", s.stgCount, s.stgTables.join(", ")]);
+        r.eachCell((c) => { c.border = borders; c.alignment = { wrapText: true, vertical: "top" }; });
+        if (sbRow++ % 2 === 1) r.eachCell((c) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT } }; });
+      }
+      if (s.appCount > 0) {
+        const r = sbWs.addRow([s.schema, "App tables", s.appCount, s.appTables.join(", ")]);
+        r.eachCell((c) => { c.border = borders; c.alignment = { wrapText: true, vertical: "top" }; });
+        if (sbRow++ % 2 === 1) r.eachCell((c) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT } }; });
+      }
+    }
+    const sbTotal = sbWs.addRow(["TOTAL", "", totalTables, `${schemas.length} schema(s)`]);
+    sbTotal.eachCell((c) => { c.font = { bold: true }; c.border = borders; });
 
     const buf = await wb.xlsx.writeBuffer();
     const safe = seed.replace(/[^A-Za-z0-9_.-]/g, "_");

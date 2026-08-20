@@ -101,7 +101,10 @@ export async function parseLineage(buf: Buffer): Promise<ParseResult> {
     if (!r.tdb || !r.sdb) q.missingDatabase += 1;
 
     const t = nodeId(r.tdb, r.tsc, r.ttb), s = nodeId(r.sdb, r.ssc, r.stb);
-    if (t === s) { q.selfReferences += 1; addIssue(n, "Self reference", t); return; }
+    // Self-references (source === target) are kept, not dropped — they're real
+    // rows in the sheet (e.g. a table that re-feeds itself) and should show up
+    // in the trace/diagram/export. Still counted for the quality report.
+    if (t === s) { q.selfReferences += 1; addIssue(n, "Self reference (kept)", t); }
     const key = `${s}->${t}`;
     if (seenEdge.has(key)) { q.duplicateEdges += 1; return; }
     seenEdge.add(key);
@@ -179,9 +182,16 @@ export interface TraceOpts {
   maxNodes?: number;
 }
 
+// Ceiling on nodes per trace. Raised well past Mermaid's own internal safety
+// limits (maxEdges: 500, maxTextSize: 50_000 chars by default — see the
+// explicit override in MermaidDiagram.tsx) so this is the limit that actually
+// applies; large real lineages (400-1000+ relationships) render fully instead
+// of silently truncating or failing partway through.
+export const DEFAULT_MAX_NODES = 1500;
+
 // Walk from one or more seeds (#7 multi-table compare).
 export function trace(g: Graph, seedIds: string[], opts: TraceOpts = {}): Trace {
-  const { direction = "upstream", maxDepth = 0, apps, maxNodes = 300 } = opts;
+  const { direction = "upstream", maxDepth = 0, apps, maxNodes = DEFAULT_MAX_NODES } = opts;
   const appFilter = apps && apps.length ? new Set(apps) : null;
   const nodes = new Map<string, LinNode>();
   const reachedBy = new Map<string, Set<string>>();
@@ -211,12 +221,12 @@ export function trace(g: Graph, seedIds: string[], opts: TraceOpts = {}): Trace 
       if (appFilter && !appFilter.has(r.app)) continue;
       const t = nodeId(r.tdb, r.tsc, r.ttb), s = nodeId(r.sdb, r.ssc, r.stb);
       const next = dir === "upstream" ? s : t;
-      if (next === id) continue;
+      const selfLoop = next === id; // keep self-referencing rows as a visible edge
       if (nodes.size >= maxNodes) { truncated = true; return; }
-      addNode(next, dir === "upstream" ? depth + 1 : -(depth + 1), false, bySeed);
+      if (!selfLoop) addNode(next, dir === "upstream" ? depth + 1 : -(depth + 1), false, bySeed);
       const k = `${s}->${t}`;
       if (!edgeKeys.has(k)) { edgeKeys.add(k); edges.push({ from: s, to: t, app: r.app }); }
-      walkOneWay(next, depth + 1, dir, bySeed, seen);
+      if (!selfLoop) walkOneWay(next, depth + 1, dir, bySeed, seen);
     }
   };
 
@@ -237,12 +247,12 @@ export function trace(g: Graph, seedIds: string[], opts: TraceOpts = {}): Trace 
         if (appFilter && !appFilter.has(r.app)) continue;
         const t = nodeId(r.tdb, r.tsc, r.ttb), s = nodeId(r.sdb, r.ssc, r.stb);
         const next = dir === "upstream" ? s : t;
-        if (next === id) continue;
+        const selfLoop = next === id; // keep self-referencing rows as a visible edge
         if (nodes.size >= maxNodes) { truncated = true; return; }
-        addNode(next, depth + 1, false, bySeed);
+        if (!selfLoop) addNode(next, depth + 1, false, bySeed);
         const k = `${s}->${t}`;
         if (!edgeKeys.has(k)) { edgeKeys.add(k); edges.push({ from: s, to: t, app: r.app }); }
-        walkBoth(next, depth + 1, bySeed, seen);
+        if (!selfLoop) walkBoth(next, depth + 1, bySeed, seen);
       }
     }
   };
@@ -355,4 +365,34 @@ export function toMermaid(t: Trace, opts: MermaidOpts = {}): { code: string; idM
     lines.push(`    class truncated chainJob;`);
   }
   return { code: lines.join("\n"), idMap, appColors };
+}
+
+// ── Schema/table breakdown ──────────────────────────────────────────────────
+// "For target table X, how many tables come from each schema — and of those,
+// how many are staging (_STG) vs application tables." Used by both the Excel
+// export and the on-screen results panel.
+export interface SchemaCount {
+  schema: string;
+  stgCount: number; appCount: number; totalCount: number;
+  stgTables: string[]; appTables: string[];
+}
+
+const isStagingTable = (table: string): boolean => /(^|_)(STG|STAGE|STAGING)(_|$)/i.test(table);
+
+export function schemaBreakdown(nodes: LinNode[], excludeSeed = true): SchemaCount[] {
+  const groups = new Map<string, { stg: Set<string>; app: Set<string> }>();
+  for (const n of nodes) {
+    if (excludeSeed && n.seed) continue;
+    const schema = n.schema || "(none)";
+    const grp = groups.get(schema) || { stg: new Set<string>(), app: new Set<string>() };
+    (isStagingTable(n.table) ? grp.stg : grp.app).add(n.table);
+    groups.set(schema, grp);
+  }
+  return [...groups.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([schema, grp]) => ({
+      schema,
+      stgCount: grp.stg.size, appCount: grp.app.size, totalCount: grp.stg.size + grp.app.size,
+      stgTables: [...grp.stg].sort(), appTables: [...grp.app].sort(),
+    }));
 }
