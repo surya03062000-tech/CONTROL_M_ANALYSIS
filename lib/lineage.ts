@@ -175,8 +175,9 @@ export interface Trace {
   nodes: LinNode[]; edges: LinEdge[]; truncated: boolean; seeds: string[];
 }
 
+export type Direction = "upstream" | "downstream" | "both" | "overall";
 export interface TraceOpts {
-  direction?: "upstream" | "downstream" | "both";
+  direction?: Direction;
   maxDepth?: number;      // 0 = unlimited
   apps?: string[];        // #1 application filter
   maxNodes?: number;
@@ -230,14 +231,13 @@ export function trace(g: Graph, seedIds: string[], opts: TraceOpts = {}): Trace 
     }
   };
 
-  // Full connected-component walk for direction="both": explores BOTH upstream
-  // and downstream edges from every node reached, not just from the seed. A
-  // table can be someone else's target from several other sources at once
-  // (e.g. a shared control table); "both" means show that whole picture, not
-  // just what's reachable by continuing in the direction the seed was first
-  // approached from. This is what "both" is for — see the direction=both bug
-  // where a two-separate-one-way-walks approach silently dropped edges.
-  const walkBoth = (id: string, depth: number, bySeed: string, seen: Set<string>) => {
+  // Full connected-component walk for direction="overall": explores BOTH
+  // upstream and downstream edges from every node reached, not just from the
+  // seed. A table can be someone else's target from several other sources at
+  // once (e.g. a shared control table); "Overall Analysis" means show that
+  // whole picture, not just what's reachable by continuing in the direction
+  // the seed was first approached from.
+  const walkOverall = (id: string, depth: number, bySeed: string, seen: Set<string>) => {
     if (maxDepth && depth >= maxDepth) return;
     if (seen.has(id)) return;
     seen.add(id);
@@ -252,14 +252,24 @@ export function trace(g: Graph, seedIds: string[], opts: TraceOpts = {}): Trace 
         if (!selfLoop) addNode(next, depth + 1, false, bySeed);
         const k = `${s}->${t}`;
         if (!edgeKeys.has(k)) { edgeKeys.add(k); edges.push({ from: s, to: t, app: r.app }); }
-        if (!selfLoop) walkBoth(next, depth + 1, bySeed, seen);
+        if (!selfLoop) walkOverall(next, depth + 1, bySeed, seen);
       }
     }
   };
 
   for (const seed of seedIds) {
-    if (direction === "both") walkBoth(seed, 0, seed, new Set());
-    else walkOneWay(seed, 0, direction, seed, new Set());
+    if (direction === "overall") {
+      walkOverall(seed, 0, seed, new Set());
+    } else if (direction === "both") {
+      // Simple "both": upstream ancestors and downstream descendants of the
+      // seed only — each walked strictly one-way and merged. Unlike
+      // "overall", this does not cross over at intermediate nodes (an
+      // intermediate node's OTHER upstream/downstream edges aren't explored).
+      walkOneWay(seed, 0, "upstream", seed, new Set());
+      walkOneWay(seed, 0, "downstream", seed, new Set());
+    } else {
+      walkOneWay(seed, 0, direction, seed, new Set());
+    }
   }
 
   // #7: mark nodes reached from more than one seed

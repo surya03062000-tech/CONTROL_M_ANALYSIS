@@ -11,7 +11,7 @@ import TiltCard from "../components/TiltCard";
 
 const MermaidDiagram = dynamic(() => import("../MermaidDiagram"), { ssr: false });
 
-type Dir = "upstream" | "downstream" | "both";
+type Dir = "upstream" | "downstream" | "both" | "overall";
 interface VFile { path: string; name: string; size: number; modified: number }
 interface Dataset { dataset: string; edges: number; loaded_at: string }
 interface Quality {
@@ -324,7 +324,8 @@ export default function LineagePage() {
             <select value={direction} onChange={(e) => setDirection(e.target.value as Dir)}>
               <option value="upstream">upstream (sources)</option>
               <option value="downstream">downstream (impact)</option>
-              <option value="both">both</option>
+              <option value="both">both (upstream + downstream)</option>
+              <option value="overall">Overall Analysis</option>
             </select>
           </div>
           <div>

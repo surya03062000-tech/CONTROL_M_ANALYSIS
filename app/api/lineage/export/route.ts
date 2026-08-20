@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { loadGraph, allowedPath } from "@/lib/lineageStore";
-import { resolveTable, trace, schemaBreakdown, DEFAULT_MAX_NODES } from "@/lib/lineage";
+import { resolveTable, trace, schemaBreakdown, DEFAULT_MAX_NODES, type Direction } from "@/lib/lineage";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     if (!allowedPath(path)) return NextResponse.json({ error: "Path not allowed" }, { status: 403 });
     const table = (sp.get("table") || "").trim();
     if (!table) return NextResponse.json({ error: "table required" }, { status: 400 });
-    const direction = (sp.get("direction") || "upstream") as "upstream" | "downstream" | "both";
+    const direction = (sp.get("direction") || "upstream") as Direction;
 
     const g = await loadGraph(path);
     const depth = Math.max(0, Math.min(20, Number(sp.get("depth") || 0)));

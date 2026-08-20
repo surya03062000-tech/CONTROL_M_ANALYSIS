@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadGraph, allowedPath } from "@/lib/lineageStore";
-import { resolveTable, trace, toMermaid, markBackEdges, schemaBreakdown, DEFAULT_MAX_NODES } from "@/lib/lineage";
+import { resolveTable, trace, toMermaid, markBackEdges, schemaBreakdown, DEFAULT_MAX_NODES, type Direction } from "@/lib/lineage";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     if (!raw) return NextResponse.json({ error: "table required" }, { status: 400 });
     const wanted = raw.split(",").map((s) => s.trim()).filter(Boolean);
 
-    const direction = (["upstream", "downstream", "both"].includes(sp.get("direction") || "") ? sp.get("direction") : "upstream") as "upstream" | "downstream" | "both";
+    const direction = (["upstream", "downstream", "both", "overall"].includes(sp.get("direction") || "") ? sp.get("direction") : "upstream") as Direction;
     const depth = Math.max(0, Math.min(20, Number(sp.get("depth") || 0)));
     const apps = (sp.get("apps") || "").split(",").map((s) => s.trim()).filter(Boolean);
     const layout = sp.get("layout") === "TB" ? "TB" : "LR";
