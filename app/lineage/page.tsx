@@ -25,16 +25,25 @@ interface Edge {
   source_db: string; source_schema: string; source_table: string;
   target_db: string; target_schema: string; target_table: string;
 }
+interface SchemaCount {
+  schema: string; stgCount: number; appCount: number; totalCount: number;
+  stgTables: string[]; appTables: string[];
+}
 interface TraceResp {
   seeds: string[]; direction: Dir; depth: number;
   counts: { nodes: number; edges: number; levels: number; apps: number; shared: number; backEdges: number };
   truncated?: boolean; nodes: any[]; edges: Edge[]; mermaid: string;
   idMap: Record<string, string>; appColors: Record<string, string>;
+  schemas?: SchemaCount[];
   ambiguous?: boolean; matches?: string[]; error?: string;
 }
 
 const fmtBytes = (n: number) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
 const fmtDate = (ms: number) => { try { return new Date(ms).toLocaleString(); } catch { return "—"; } };
+// On-screen table lists are capped for readability (schemas can have 40+ tables);
+// the Excel export always has the full list.
+const tableList = (names: string[], max = 8) =>
+  names.length <= max ? names.join(", ") : `${names.slice(0, max).join(", ")} … +${names.length - max} more`;
 
 export default function LineagePage() {
   const { toast } = useToast();
@@ -402,6 +411,40 @@ export default function LineagePage() {
           </div>
 
           {result.truncated && <div className="note" style={{ marginTop: 12, background: "var(--warn-bg)", color: "var(--warn)", border: "1px solid color-mix(in srgb, var(--warn) 30%, transparent)" }}><AlertTriangle size={14} /> Large graph — truncated. Reduce depth or filter by application.</div>}
+
+          {!!result.schemas?.length && (
+            <div style={{ marginTop: 18 }}>
+              <strong style={{ fontSize: 14 }}>Target Table: <span className="mono">{result.seeds.join(", ")}</span></strong>
+              <div className="muted small" style={{ marginTop: 2 }}>Dependency tables by schema (staging vs application), excluding the target itself.</div>
+              <div className="ltable-wrap" style={{ marginTop: 10 }}>
+                <table className="ltable">
+                  <thead><tr><th>Schema</th><th>Category</th><th>Count</th><th>Tables</th></tr></thead>
+                  <tbody>
+                    {result.schemas.flatMap((s) => {
+                      const rows: React.ReactNode[] = [];
+                      if (s.stgCount > 0) rows.push(
+                        <tr key={s.schema + "-stg"}>
+                          <td className="mono">{s.schema}</td>
+                          <td><span className="tpill t-sick">Stg tables</span></td>
+                          <td>{s.stgCount}</td>
+                          <td className="muted small">{tableList(s.stgTables)}</td>
+                        </tr>
+                      );
+                      if (s.appCount > 0) rows.push(
+                        <tr key={s.schema + "-app"}>
+                          <td className="mono">{s.schema}</td>
+                          <td><span className="tpill t-planned">App tables</span></td>
+                          <td>{s.appCount}</td>
+                          <td className="muted small">{tableList(s.appTables)}</td>
+                        </tr>
+                      );
+                      return rows;
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* legend (#12) */}
           <div className="lin-legend">

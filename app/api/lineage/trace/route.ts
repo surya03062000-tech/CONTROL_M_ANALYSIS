@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadGraph, allowedPath } from "@/lib/lineageStore";
-import { resolveTable, trace, toMermaid, markBackEdges } from "@/lib/lineage";
+import { resolveTable, trace, toMermaid, markBackEdges, schemaBreakdown, DEFAULT_MAX_NODES } from "@/lib/lineage";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,11 +37,13 @@ export async function GET(req: NextRequest) {
       seeds.push(matches[0]);
     }
 
-    const t = trace(g, seeds, { direction, maxDepth: depth, apps, maxNodes: 300 });
+    const t = trace(g, seeds, { direction, maxDepth: depth, apps, maxNodes: DEFAULT_MAX_NODES });
     // Cycles are real in lineage data; mark back-edges so the diagram lays out
     // acyclically instead of failing to render (notably for direction=both).
     const backEdges = markBackEdges(t);
     const { code, idMap, appColors } = toMermaid(t, { layout, group, colorBy });
+    // Target table X: how many tables come from each schema, split staging vs app.
+    const schemas = schemaBreakdown(t.nodes);
 
     const edges = t.edges.map((e) => {
       const s = g.nodes.get(e.from)!, d = g.nodes.get(e.to)!;
@@ -62,7 +64,7 @@ export async function GET(req: NextRequest) {
         backEdges,
       },
       truncated: t.truncated,
-      nodes: t.nodes, edges, mermaid: code, idMap, appColors,
+      nodes: t.nodes, edges, mermaid: code, idMap, appColors, schemas,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
