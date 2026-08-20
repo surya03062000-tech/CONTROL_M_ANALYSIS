@@ -63,7 +63,14 @@ export default function MermaidDiagram({
           // what DEFAULT_MAX_NODES in lib/lineage.ts can produce.
           maxEdges: 20000,
           maxTextSize: 4_000_000,
-          flowchart: { useMaxWidth: false, htmlLabels: false, curve: "basis" },
+          // Mermaid renders node labels through an HTML foreignObject regardless
+          // of htmlLabels here, and wraps text once its natural width hits
+          // flowchart.wrappingWidth (default 200px) — long, unbroken table/file
+          // names (100+ chars, no spaces) were getting force-wrapped into a
+          // narrow column that didn't match the auto-sized node box, so most of
+          // the name was effectively unreadable. Raising this keeps long names
+          // on one line, matching the box mermaid already sizes to fit them.
+          flowchart: { useMaxWidth: false, htmlLabels: false, curve: "basis", wrappingWidth: 4000 },
         });
         const id = "mmd-" + Math.random().toString(36).slice(2);
         const { svg } = await mermaid.render(id, rogersTheme(code));
