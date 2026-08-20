@@ -199,7 +199,10 @@ export function trace(g: Graph, seedIds: string[], opts: TraceOpts = {}): Trace 
 
   for (const s of seedIds) addNode(s, 0, true, s);
 
-  const walk = (id: string, depth: number, dir: "upstream" | "downstream", bySeed: string, seen: Set<string>) => {
+  // Strict single-direction walk (upstream-only / downstream-only): every hop
+  // keeps following edges the same way, so "upstream" shows only ancestors and
+  // "downstream" shows only descendants.
+  const walkOneWay = (id: string, depth: number, dir: "upstream" | "downstream", bySeed: string, seen: Set<string>) => {
     if (maxDepth && depth >= maxDepth) return;
     if (seen.has(id)) return;
     seen.add(id);
@@ -213,13 +216,40 @@ export function trace(g: Graph, seedIds: string[], opts: TraceOpts = {}): Trace 
       addNode(next, dir === "upstream" ? depth + 1 : -(depth + 1), false, bySeed);
       const k = `${s}->${t}`;
       if (!edgeKeys.has(k)) { edgeKeys.add(k); edges.push({ from: s, to: t, app: r.app }); }
-      walk(next, depth + 1, dir, bySeed, seen);
+      walkOneWay(next, depth + 1, dir, bySeed, seen);
+    }
+  };
+
+  // Full connected-component walk for direction="both": explores BOTH upstream
+  // and downstream edges from every node reached, not just from the seed. A
+  // table can be someone else's target from several other sources at once
+  // (e.g. a shared control table); "both" means show that whole picture, not
+  // just what's reachable by continuing in the direction the seed was first
+  // approached from. This is what "both" is for — see the direction=both bug
+  // where a two-separate-one-way-walks approach silently dropped edges.
+  const walkBoth = (id: string, depth: number, bySeed: string, seen: Set<string>) => {
+    if (maxDepth && depth >= maxDepth) return;
+    if (seen.has(id)) return;
+    seen.add(id);
+    for (const dir of ["upstream", "downstream"] as const) {
+      const rows = (dir === "upstream" ? g.upstream : g.downstream).get(id) || [];
+      for (const r of rows) {
+        if (appFilter && !appFilter.has(r.app)) continue;
+        const t = nodeId(r.tdb, r.tsc, r.ttb), s = nodeId(r.sdb, r.ssc, r.stb);
+        const next = dir === "upstream" ? s : t;
+        if (next === id) continue;
+        if (nodes.size >= maxNodes) { truncated = true; return; }
+        addNode(next, depth + 1, false, bySeed);
+        const k = `${s}->${t}`;
+        if (!edgeKeys.has(k)) { edgeKeys.add(k); edges.push({ from: s, to: t, app: r.app }); }
+        walkBoth(next, depth + 1, bySeed, seen);
+      }
     }
   };
 
   for (const seed of seedIds) {
-    if (direction === "upstream" || direction === "both") walk(seed, 0, "upstream", seed, new Set());
-    if (direction === "downstream" || direction === "both") walk(seed, 0, "downstream", seed, new Set());
+    if (direction === "both") walkBoth(seed, 0, seed, new Set());
+    else walkOneWay(seed, 0, direction, seed, new Set());
   }
 
   // #7: mark nodes reached from more than one seed
