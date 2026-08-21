@@ -344,13 +344,18 @@ input.err { border-color: var(--err); }
 .zoom-bar { display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
 .zoom-bar .icon-btn { width: 32px; height: 32px; }
 .zoom-sep { width: 1px; height: 22px; background: var(--line-2); margin: 0 4px; }
-.mm-wrapper { width: 100% !important; height: 480px !important; background-color: var(--diagram-bg); background-image: repeating-linear-gradient(45deg, var(--diagram-stripe) 0 10px, var(--diagram-stripe2) 10px 20px); cursor: grab; }
+.mm-wrapper { width: 100% !important; height: 480px !important; overflow: hidden; background-color: var(--diagram-bg); background-image: repeating-linear-gradient(45deg, var(--diagram-stripe) 0 10px, var(--diagram-stripe2) 10px 20px); cursor: grab; }
 .mm-wrapper:active { cursor: grabbing; }
 .mm-content { display: block; }
 .mermaid-host svg { display: block; }
 .mm-hit rect, .mm-hit polygon, .mm-hit circle, .mm-hit path { stroke: #DA291C !important; stroke-width: 3px !important; }
 .diagram-block.mm-full { position: fixed; inset: 0; z-index: 60; margin: 0; border-radius: 0; background: var(--surface); display: flex; flex-direction: column; }
-.diagram-block.mm-full .mm-wrapper { flex: 1; height: auto !important; }
+/* .mm-wrapper isn't a direct flex child here (react-zoom-pan-pinch renders its own
+   wrapper divs in between), so flex-grow on it is inert. Absolute-fill the nearest
+   positioned ancestor (.diagram-stage) instead — this reliably fills the fullscreen
+   viewport regardless of the library's internal DOM structure. */
+.diagram-block.mm-full .diagram-stage { flex: 1; min-height: 0; }
+.diagram-block.mm-full .mm-wrapper { position: absolute; inset: 0; height: auto !important; }
 .source { padding: 12px 14px; border-top: 1px solid var(--line); }
 .diagram-block.mm-full .source { display: none; }
 .source summary { cursor: pointer; font-size: 12.5px; color: var(--accent); font-weight: 600; }

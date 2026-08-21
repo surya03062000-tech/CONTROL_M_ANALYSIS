@@ -1,126 +1,104 @@
 import { NextRequest, NextResponse } from "next/server";
-import ExcelJS from "exceljs";
 import { loadGraph, allowedPath } from "@/lib/lineageStore";
-import { resolveTable, trace, schemaBreakdown, DEFAULT_MAX_NODES, type Direction } from "@/lib/lineage";
+import { resolveTable, trace, DEFAULT_MAX_NODES, type Direction } from "@/lib/lineage";
+import { buildLineageWorkbook, type DiagramImage } from "@/lib/lineageExcel";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const RED = "FFDA291C", ALT = "FFF7F8FB", BORDER = "FFE2E7F0";
-const thin = { style: "thin" as const, color: { argb: BORDER } };
-const borders = { top: thin, left: thin, bottom: thin, right: thin };
+interface ExportParams {
+  path: string; table: string; direction: Direction; depth: number; apps: string[];
+}
 
-// Excel export of a traced lineage (edges + nodes).
+function parseParams(sp: URLSearchParams): ExportParams | { error: string; status: number } {
+  const path = sp.get("path") || "";
+  if (!allowedPath(path)) return { error: "Path not allowed", status: 403 };
+  const table = (sp.get("table") || "").trim();
+  if (!table) return { error: "table required", status: 400 };
+  const direction = (sp.get("direction") || "upstream") as Direction;
+  const depth = Math.max(0, Math.min(20, Number(sp.get("depth") || 0)));
+  const apps = (sp.get("apps") || "").split(",").map((s) => s.trim()).filter(Boolean);
+  return { path, table, direction, depth, apps };
+}
+
+// image/png;base64,.... -> Buffer (also accepts a bare base64 string)
+function decodeDataUrl(dataUrl: string): Buffer | null {
+  const m = /^data:image\/png;base64,(.+)$/.exec(dataUrl);
+  try { return Buffer.from(m ? m[1] : dataUrl, "base64"); } catch { return null; }
+}
+
+async function resolveSeedsAndTrace(path: string, table: string, direction: Direction, depth: number, apps: string[]) {
+  const g = await loadGraph(path);
+  const seeds: string[] = [];
+  for (const w of table.split(",").map((s) => s.trim()).filter(Boolean)) {
+    const m = resolveTable(g, w);
+    if (m.length) seeds.push(m[0]);
+  }
+  if (!seeds.length) return null;
+  const t = trace(g, seeds, { direction, maxDepth: depth, apps, maxNodes: DEFAULT_MAX_NODES });
+  return { g, seeds, t };
+}
+
+function xlsxResponse(buf: ArrayBuffer, seeds: string[], direction: Direction) {
+  const safe = seeds.join("_").replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 80);
+  return new NextResponse(buf as any, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="lineage-${safe}-${direction}.xlsx"`,
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+// GET — plain export (no diagram sheet; used for bookmarkable/simple links).
 export async function GET(req: NextRequest) {
   try {
-    const sp = req.nextUrl.searchParams;
-    const path = sp.get("path") || "";
-    if (!allowedPath(path)) return NextResponse.json({ error: "Path not allowed" }, { status: 403 });
-    const table = (sp.get("table") || "").trim();
-    if (!table) return NextResponse.json({ error: "table required" }, { status: 400 });
-    const direction = (sp.get("direction") || "upstream") as Direction;
+    const parsed = parseParams(req.nextUrl.searchParams);
+    if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+    const { path, table, direction, depth, apps } = parsed;
 
-    const g = await loadGraph(path);
-    const depth = Math.max(0, Math.min(20, Number(sp.get("depth") || 0)));
-    const apps = (sp.get("apps") || "").split(",").map((s) => s.trim()).filter(Boolean);
-    const seeds: string[] = [];
-    for (const w of table.split(",").map((s) => s.trim()).filter(Boolean)) {
-      const m = resolveTable(g, w);
-      if (m.length) seeds.push(m[0]);
-    }
-    if (!seeds.length) return NextResponse.json({ error: "No matching table" }, { status: 404 });
-    const seed = seeds[0];
-    const t = trace(g, seeds, { direction, maxDepth: depth, apps, maxNodes: DEFAULT_MAX_NODES });
-    const schemas = schemaBreakdown(t.nodes);
+    const resolved = await resolveSeedsAndTrace(path, table, direction, depth, apps);
+    if (!resolved) return NextResponse.json({ error: "No matching table" }, { status: 404 });
+    const { g, seeds, t } = resolved;
 
-    const wb = new ExcelJS.Workbook();
-    wb.creator = "OpsCentral — Data Lineage";
-
-    const ws = wb.addWorksheet("Lineage", { views: [{ state: "frozen", ySplit: 3 }] });
-    ws.mergeCells("A1:G1");
-    const title = ws.getCell("A1");
-    title.value = `Data Lineage — ${seed} (${direction})`;
-    title.font = { bold: true, size: 14, color: { argb: RED } };
-    ws.getCell("A2").value = `${t.nodes.length} table(s) · ${t.edges.length} relationship(s) · generated ${new Date().toISOString().slice(0, 19).replace("T", " ")}`;
-    ws.getCell("A2").font = { italic: true, size: 10, color: { argb: "FF777777" } };
-
-    ws.columns = [
-      { width: 26 }, { width: 16 }, { width: 20 }, { width: 34 }, { width: 16 }, { width: 20 }, { width: 34 },
-    ];
-    const head = ws.addRow(["Applications", "Source database", "Source schema", "Source table", "Target database", "Target schema", "Target table"]);
-    head.eachCell((c) => {
-      c.font = { bold: true, color: { argb: "FFFFFFFF" } };
-      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: RED } };
-      c.border = borders;
-    });
-    ws.autoFilter = { from: "A3", to: "G3" };
-
-    t.edges.forEach((e, i) => {
-      const s = g.nodes.get(e.from)!, d = g.nodes.get(e.to)!;
-      const r = ws.addRow([e.app, s.db, s.schema, s.table, d.db, d.schema, d.table]);
-      r.eachCell((c) => { c.border = borders; });
-      if (i % 2 === 1) r.eachCell((c) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT } }; });
-    });
-
-    const nodesWs = wb.addWorksheet("Tables", { views: [{ state: "frozen", ySplit: 1 }] });
-    nodesWs.columns = [{ width: 40 }, { width: 16 }, { width: 20 }, { width: 34 }, { width: 10 }, { width: 10 }];
-    const nh = nodesWs.addRow(["Full name", "Database", "Schema", "Table", "Level", "Seed"]);
-    nh.eachCell((c) => {
-      c.font = { bold: true, color: { argb: "FFFFFFFF" } };
-      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: RED } };
-      c.border = borders;
-    });
-    t.nodes.forEach((n, i) => {
-      const r = nodesWs.addRow([n.id, n.db, n.schema, n.table, n.level, n.seed ? "Yes" : ""]);
-      r.eachCell((c) => { c.border = borders; });
-      if (i % 2 === 1) r.eachCell((c) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT } }; });
-    });
-
-    // Target Table: X — how many tables come from each schema, split staging vs
-    // application (e.g. "ELA_V21: 5 tables", "APP_IFRS: 4 Stg tables / 3 App tables").
-    const sbWs = wb.addWorksheet("Schema Breakdown", { views: [{ state: "frozen", ySplit: 3 }] });
-    sbWs.mergeCells("A1:D1");
-    const sbTitle = sbWs.getCell("A1");
-    sbTitle.value = `Target Table: ${seed}`;
-    sbTitle.font = { bold: true, size: 14, color: { argb: RED } };
-    sbWs.getCell("A2").value = "Dependency table count per schema (staging vs application), excluding the target itself.";
-    sbWs.getCell("A2").font = { italic: true, size: 10, color: { argb: "FF777777" } };
-    sbWs.columns = [{ width: 26 }, { width: 14 }, { width: 13 }, { width: 80 }];
-    const sbHead = sbWs.addRow(["Schema", "Category", "Table Count", "Tables"]);
-    sbHead.eachCell((c) => {
-      c.font = { bold: true, color: { argb: "FFFFFFFF" } };
-      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: RED } };
-      c.border = borders;
-    });
-    sbWs.autoFilter = { from: "A3", to: "D3" };
-
-    let sbRow = 0, totalTables = 0;
-    for (const s of schemas) {
-      totalTables += s.totalCount;
-      if (s.stgCount > 0) {
-        const r = sbWs.addRow([s.schema, "Stg tables", s.stgCount, s.stgTables.join(", ")]);
-        r.eachCell((c) => { c.border = borders; c.alignment = { wrapText: true, vertical: "top" }; });
-        if (sbRow++ % 2 === 1) r.eachCell((c) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT } }; });
-      }
-      if (s.appCount > 0) {
-        const r = sbWs.addRow([s.schema, "App tables", s.appCount, s.appTables.join(", ")]);
-        r.eachCell((c) => { c.border = borders; c.alignment = { wrapText: true, vertical: "top" }; });
-        if (sbRow++ % 2 === 1) r.eachCell((c) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT } }; });
-      }
-    }
-    const sbTotal = sbWs.addRow(["TOTAL", "", totalTables, `${schemas.length} schema(s)`]);
-    sbTotal.eachCell((c) => { c.font = { bold: true }; c.border = borders; });
-
+    const wb = await buildLineageWorkbook(g, seeds, direction, t);
     const buf = await wb.xlsx.writeBuffer();
-    const safe = seed.replace(/[^A-Za-z0-9_.-]/g, "_");
-    return new NextResponse(buf as any, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="lineage-${safe}-${direction}.xlsx"`,
-        "Cache-Control": "no-store",
-      },
-    });
+    return xlsxResponse(buf as any, seeds, direction);
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
+  }
+}
+
+// POST — same export, plus an optional client-rasterized diagram PNG embedded
+// as a new "Diagram" sheet (#4: the full lineage diagram alongside the data).
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json().catch(() => ({}));
+    const path = String(body.path || "");
+    if (!allowedPath(path)) return NextResponse.json({ error: "Path not allowed" }, { status: 403 });
+    const table = String(body.table || "").trim();
+    if (!table) return NextResponse.json({ error: "table required" }, { status: 400 });
+    const direction = (body.direction || "upstream") as Direction;
+    const depth = Math.max(0, Math.min(20, Number(body.depth || 0)));
+    const apps: string[] = Array.isArray(body.apps) ? body.apps
+      : String(body.apps || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+
+    const resolved = await resolveSeedsAndTrace(path, table, direction, depth, apps);
+    if (!resolved) return NextResponse.json({ error: "No matching table" }, { status: 404 });
+    const { g, seeds, t } = resolved;
+
+    let diagram: DiagramImage | undefined;
+    const dataUrl = typeof body.diagramPng === "string" ? body.diagramPng : "";
+    const w = Number(body.diagramWidth), h = Number(body.diagramHeight);
+    if (dataUrl && w > 0 && h > 0) {
+      const buf = decodeDataUrl(dataUrl);
+      if (buf && buf.length) diagram = { buf, width: w, height: h };
+    }
+
+    const wb = await buildLineageWorkbook(g, seeds, direction, t, diagram);
+    const buf = await wb.xlsx.writeBuffer();
+    return xlsxResponse(buf as any, seeds, direction);
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
   }
