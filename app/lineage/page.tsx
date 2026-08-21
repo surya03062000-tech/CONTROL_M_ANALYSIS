@@ -8,8 +8,15 @@ import {
 } from "lucide-react";
 import { useToast } from "../components/Toast";
 import TiltCard from "../components/TiltCard";
+import type { MermaidDiagramApi } from "../MermaidDiagram";
 
 const MermaidDiagram = dynamic(() => import("../MermaidDiagram"), { ssr: false });
+
+function triggerDownload(url: string, name: string) {
+  const a = document.createElement("a");
+  a.href = url; a.download = name; document.body.appendChild(a); a.click();
+  a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
 
 type Dir = "upstream" | "downstream" | "both" | "overall";
 interface VFile { path: string; name: string; size: number; modified: number }
@@ -78,6 +85,8 @@ export default function LineagePage() {
   const [tracing, setTracing] = useState(false);
   const [result, setResult] = useState<TraceResp | null>(null);
   const [ambiguous, setAmbiguous] = useState<string[] | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const diagramApiRef = useRef<MermaidDiagramApi | null>(null);
   const bootstrapped = useRef(false);
 
   useEffect(() => { loadSources(); }, []);
@@ -191,6 +200,38 @@ export default function LineagePage() {
   const copyLink = () => {
     navigator.clipboard?.writeText(window.location.href).then(
       () => toast("Link copied", "success"), () => toast("Copy failed", "error"));
+  };
+
+  // Grab a rasterized copy of whatever's on screen (if the diagram is ready)
+  // and POST it alongside the trace params so the server can embed a "Diagram"
+  // sheet — falls back to a plain export if rasterization isn't available.
+  const exportExcel = async () => {
+    if (!result) return;
+    setExporting(true);
+    try {
+      const png = await diagramApiRef.current?.getPngDataUrl().catch(() => null);
+      const r = await fetch("/api/lineage/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: ref, table: result.seeds.join(","), direction: result.direction, depth,
+          apps: selApps,
+          diagramPng: png?.dataUrl, diagramWidth: png?.width, diagramHeight: png?.height,
+        }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.error || "Export failed");
+      }
+      const blob = await r.blob();
+      const cd = r.headers.get("Content-Disposition") || "";
+      const m = /filename="([^"]+)"/.exec(cd);
+      triggerDownload(URL.createObjectURL(blob), m ? m[1] : "lineage.xlsx");
+    } catch (e: any) {
+      toast(e?.message || "Export failed", "error");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const qualityBad = quality && (quality.skipped > 0 || quality.duplicateEdges > 0 || quality.selfReferences > 0);
@@ -459,13 +500,14 @@ export default function LineagePage() {
           </div>
 
           <MermaidDiagram code={result.mermaid} idMap={result.idMap}
-            onNodeClick={(id) => { setQ(id); runTrace([id]); }} />
+            onNodeClick={(id) => { setQ(id); runTrace([id]); }}
+            onReady={(api) => { diagramApiRef.current = api; }} />
 
           <div className="row" style={{ marginTop: 16 }}>
-            <a className="btn download" href={`/api/lineage/export?path=${encodeURIComponent(ref)}&table=${encodeURIComponent(result.seeds.join(","))}&direction=${result.direction}&depth=${depth}${selApps.length ? `&apps=${encodeURIComponent(selApps.join(","))}` : ""}`}>
-              <Download size={16} /> Download lineage (Excel)
-            </a>
-            <span className="muted small">Diagram PNG / SVG is in the toolbar above.</span>
+            <button className="btn download" onClick={exportExcel} disabled={exporting}>
+              {exporting ? <><Loader2 size={16} className="spin" /> Preparing…</> : <><Download size={16} /> Download lineage (Excel)</>}
+            </button>
+            <span className="muted small">Includes a full diagram sheet · PNG / SVG export is in the toolbar above.</span>
           </div>
 
           <div className="ltable-wrap" style={{ marginTop: 18 }}>

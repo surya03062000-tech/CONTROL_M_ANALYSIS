@@ -23,12 +23,20 @@ function rogersTheme(code: string): string {
     .replace(/classDef chainJob[^\n;]*/g, "classDef chainJob fill:#FCE9E7,stroke:#E3B4AF,color:#3a3a3a");
 }
 
+// Exposed to the host page (via onReady) so it can grab a rasterized copy of
+// whatever is currently rendered — used to embed the diagram into the Excel
+// export without duplicating mermaid rendering server-side.
+export interface MermaidDiagramApi {
+  getPngDataUrl: () => Promise<{ dataUrl: string; width: number; height: number } | null>;
+}
+
 export default function MermaidDiagram({
-  code, liveUrl, idMap, onNodeClick,
+  code, liveUrl, idMap, onNodeClick, onReady,
 }: {
   code: string; liveUrl?: string;
   idMap?: Record<string, string>;              // mermaid node id -> real id
   onNodeClick?: (id: string) => void;          // #6 click a node to drill in
+  onReady?: (api: MermaidDiagramApi) => void;   // hand the host a PNG-export hook
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const twRef = useRef<any>(null);
@@ -37,6 +45,8 @@ export default function MermaidDiagram({
   const [query, setQuery] = useState("");
   const [ready, setReady] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const themeRef = useRef<"light" | "dark">("light");
+  useEffect(() => { themeRef.current = theme; }, [theme]);
 
   // follow the app theme
   useEffect(() => {
@@ -45,6 +55,23 @@ export default function MermaidDiagram({
     const obs = new MutationObserver(read);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     return () => obs.disconnect();
+  }, []);
+
+  // Hand the host page a stable handle for on-demand PNG export (Excel embed).
+  // Reads the live SVG/theme at call time, so it stays correct across re-renders.
+  useEffect(() => {
+    if (!onReady) return;
+    onReady({
+      getPngDataUrl: async () => {
+        const svg = svgEl();
+        if (!svg) return null;
+        const r = await rasterizeSvg(svg, themeRef.current);
+        if (!r) return null;
+        const dataUrl = await blobToDataUrl(r.blob);
+        return { dataUrl, width: r.width, height: r.height };
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // render the diagram (re-runs on code or theme change)
@@ -157,24 +184,10 @@ export default function MermaidDiagram({
 
   function downloadPng() {
     const svg = svgEl(); if (!svg) return;
-    const vb = svg.viewBox?.baseVal;
-    const rect = svg.getBoundingClientRect();
-    const w = Math.max(1, Math.round(vb && vb.width ? vb.width : rect.width));
-    const h = Math.max(1, Math.round(vb && vb.height ? vb.height : rect.height));
-    const scale = 2;
-    const data = new XMLSerializer().serializeToString(svg);
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = w * scale; canvas.height = h * scale;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.fillStyle = theme === "dark" ? "#0f141d" : "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob((b) => { if (b) triggerDownload(URL.createObjectURL(b), "control-m-lineage.png"); });
-    };
-    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(data);
+    rasterizeSvg(svg, theme).then((r) => {
+      if (r) triggerDownload(URL.createObjectURL(r.blob), "control-m-lineage.png");
+      else window.alert("Couldn't generate a PNG for this diagram — it's too large to rasterize in this browser. Try SVG export instead.");
+    });
   }
 
   if (err) {
@@ -239,4 +252,59 @@ function triggerDownload(url: string, name: string) {
   const a = document.createElement("a");
   a.href = url; a.download = name; document.body.appendChild(a); a.click();
   a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function svgPixelSize(svg: SVGSVGElement): { w: number; h: number } {
+  const vb = svg.viewBox?.baseVal;
+  const rect = svg.getBoundingClientRect();
+  const w = Math.max(1, Math.round(vb && vb.width ? vb.width : rect.width));
+  const h = Math.max(1, Math.round(vb && vb.height ? vb.height : rect.height));
+  return { w, h };
+}
+
+// Browsers cap canvas dimensions (commonly ~16384px on a side) and total pixel
+// count (well under width*height for very large canvases in some browsers).
+// A big lineage diagram rendered at a flat scale of 2 easily blew past that —
+// canvas.toBlob() silently resolving null, or the canvas failing to allocate
+// at all. Clamp the rasterization scale to a safe budget instead, so export
+// keeps working (just at a lower scale) however large the graph gets.
+const MAX_CANVAS_DIM = 8000;
+const MAX_CANVAS_AREA = 30_000_000;
+function safeScale(w: number, h: number, desired: number): number {
+  let scale = desired;
+  scale = Math.min(scale, MAX_CANVAS_DIM / Math.max(w, h));
+  scale = Math.min(scale, Math.sqrt(MAX_CANVAS_AREA / (w * h)));
+  return Math.max(0.05, scale);
+}
+
+function rasterizeSvg(svg: SVGSVGElement, theme: "light" | "dark", desiredScale = 2): Promise<{ blob: Blob; width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const { w, h } = svgPixelSize(svg);
+    const scale = safeScale(w, h, desiredScale);
+    const width = Math.max(1, Math.round(w * scale));
+    const height = Math.max(1, Math.round(h * scale));
+    const data = new XMLSerializer().serializeToString(svg);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(null); return; }
+      ctx.fillStyle = theme === "dark" ? "#0f141d" : "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((b) => resolve(b ? { blob: b, width, height } : null));
+    };
+    img.onerror = () => resolve(null);
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(data);
+  });
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 }

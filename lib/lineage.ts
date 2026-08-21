@@ -11,7 +11,7 @@ export interface LinNode {
   id: string; table: string; schema: string; db: string; app: string;
   level: number; seed?: boolean; shared?: boolean;
 }
-export interface LinEdge { from: string; to: string; app: string; backEdge?: boolean }
+export interface LinEdge { from: string; to: string; app: string; backEdge?: boolean; seeds: string[] }
 
 const BLANK = new Set(["", "(blank)", "-", "--", "n/a", "na", "null", "none"]);
 const clean = (v: any) => {
@@ -197,7 +197,17 @@ export function trace(g: Graph, seedIds: string[], opts: TraceOpts = {}): Trace 
   const nodes = new Map<string, LinNode>();
   const reachedBy = new Map<string, Set<string>>();
   const edges: LinEdge[] = [];
-  const edgeKeys = new Set<string>();
+  // Keyed by "from->to" so an edge reached by more than one seed (multi-table
+  // compare) is recorded once but keeps every seed that reached it — the
+  // Excel export uses this to attribute each row back to its input table.
+  const edgeByKey = new Map<string, LinEdge>();
+  const addEdge = (from: string, to: string, app: string, bySeed: string) => {
+    const k = `${from}->${to}`;
+    let e = edgeByKey.get(k);
+    if (!e) { e = { from, to, app, seeds: [bySeed] }; edgeByKey.set(k, e); edges.push(e); }
+    else if (!e.seeds.includes(bySeed)) e.seeds.push(bySeed);
+    return e;
+  };
   let truncated = false;
 
   const addNode = (id: string, level: number, seed: boolean, bySeed: string) => {
@@ -225,8 +235,7 @@ export function trace(g: Graph, seedIds: string[], opts: TraceOpts = {}): Trace 
       const selfLoop = next === id; // keep self-referencing rows as a visible edge
       if (nodes.size >= maxNodes) { truncated = true; return; }
       if (!selfLoop) addNode(next, dir === "upstream" ? depth + 1 : -(depth + 1), false, bySeed);
-      const k = `${s}->${t}`;
-      if (!edgeKeys.has(k)) { edgeKeys.add(k); edges.push({ from: s, to: t, app: r.app }); }
+      addEdge(s, t, r.app, bySeed);
       if (!selfLoop) walkOneWay(next, depth + 1, dir, bySeed, seen);
     }
   };
@@ -250,8 +259,7 @@ export function trace(g: Graph, seedIds: string[], opts: TraceOpts = {}): Trace 
         const selfLoop = next === id; // keep self-referencing rows as a visible edge
         if (nodes.size >= maxNodes) { truncated = true; return; }
         if (!selfLoop) addNode(next, depth + 1, false, bySeed);
-        const k = `${s}->${t}`;
-        if (!edgeKeys.has(k)) { edgeKeys.add(k); edges.push({ from: s, to: t, app: r.app }); }
+        addEdge(s, t, r.app, bySeed);
         if (!selfLoop) walkOverall(next, depth + 1, bySeed, seen);
       }
     }
