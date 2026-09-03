@@ -1650,8 +1650,10 @@ def build_mermaid(rows, pred, succ, input_jobs, max_nodes=80, direction="LR"):
     lines.append("    classDef chainJob fill:#E3F2FD,stroke:#666;")
     for jn in selected:
         nid = _mermaid_safe_id(jn)
-        label = jn if len(jn) <= 45 else jn[:42] + "…"
-        lines.append(f'    {nid}["{label}"]')
+        # Full job name, not truncated — the portal's mermaid.initialize() raises
+        # flowchart.wrappingWidth well past the label's natural width, so the full
+        # name renders on one line instead of being cut short here.
+        lines.append(f'    {nid}["{jn}"]')
     edge_count = 0
     for jn in selected:
         for p in pred.get(jn, set()):
