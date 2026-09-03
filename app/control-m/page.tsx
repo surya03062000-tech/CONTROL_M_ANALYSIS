@@ -149,28 +149,58 @@ export default function ControlMPage() {
     setFile(f); setUploadPct(0);
   }
 
-  function upload() {
+  // Sent as many small chunks rather than one big request — Vercel rejects any
+  // single request body past a small fixed size (413), which is what made
+  // uploading a real Control-M workspace XML fail. Each chunk lands as a temp
+  // part in the Volume; a final "finalize" call has the server reassemble them.
+  const CHUNK_SIZE = 750 * 1024;
+
+  async function postUpload(fd: FormData): Promise<any> {
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      headers: password ? { "x-app-password": password } : undefined,
+      body: fd,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Upload failed");
+    return data;
+  }
+
+  async function upload() {
     if (!file) return;
     if (!file.name.toLowerCase().endsWith(".xml")) { toast("Please choose a .xml file", "error"); return; }
     setUploadPct(0); setUploading(true);
-    const fd = new FormData(); fd.append("file", file);
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/upload");
-    if (password) xhr.setRequestHeader("x-app-password", password);
-    xhr.upload.onprogress = (e) => { if (e.lengthComputable) setUploadPct(Math.round((e.loaded / e.total) * 100)); };
-    xhr.onload = () => {
+    try {
+      const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+      const uploadId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+      let sentBytes = 0;
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const chunk = file.slice(start, Math.min(start + CHUNK_SIZE, file.size));
+        const fd = new FormData();
+        fd.append("action", "chunk");
+        fd.append("uploadId", uploadId);
+        fd.append("chunkIndex", String(i));
+        fd.append("file", chunk, "chunk");
+        await postUpload(fd);
+        sentBytes += chunk.size;
+        setUploadPct(Math.round((sentBytes / file.size) * 95)); // last 5% reserved for finalize
+      }
+      const fd = new FormData();
+      fd.append("action", "finalize");
+      fd.append("uploadId", uploadId);
+      fd.append("filename", file.name);
+      fd.append("totalChunks", String(totalChunks));
+      const data = await postUpload(fd);
+      setXmlFilename(data.filename || "");
+      setUploadPct(100);
+      toast(`Uploaded ${file.name}`, "success");
+    } catch (e: any) {
+      toast(e?.message || "Upload failed", "error");
+      setUploadPct(0);
+    } finally {
       setUploading(false);
-      try {
-        const data = JSON.parse(xhr.responseText);
-        if (xhr.status >= 200 && xhr.status < 300) {
-          setXmlFilename(data.filename || "");
-          setUploadPct(100);
-          toast(`Uploaded ${file.name}`, "success");
-        } else { toast(data.error || "Upload failed", "error"); setUploadPct(0); }
-      } catch { toast("Upload failed", "error"); setUploadPct(0); }
-    };
-    xhr.onerror = () => { setUploading(false); setUploadPct(0); toast("Network error during upload", "error"); };
-    xhr.send(fd);
+    }
   }
 
   function validate(): Record<string, string> {

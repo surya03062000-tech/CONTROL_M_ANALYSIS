@@ -145,6 +145,12 @@ export async function downloadFile(absPath: string): Promise<Response> {
   return dbx(`/api/2.0/fs/files${encodePath(absPath)}`, { method: "GET" });
 }
 
+// Delete a single file from a Volume (used to clean up chunked-upload temp parts).
+export async function deleteFile(absPath: string): Promise<void> {
+  if (!HOST || !TOKEN) return;
+  await dbx(`/api/2.0/fs/files${encodePath(absPath)}`, { method: "DELETE" });
+}
+
 // List .xlsx files in any Volume folder (newest first) — used by the DG tool.
 export async function listVolumeXlsx(volume: string): Promise<OutputFile[]> {
   if (!HOST || !TOKEN) return [];
